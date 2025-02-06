@@ -1,10 +1,12 @@
 "use client";
-import { useEffect, useRef} from "react";
+import { useEffect, useRef } from "react";
 import { useWebGPU, WebGPUState } from "@/hooks/useWebGPU";
-import { useRenderResources, RenderPipelineResources } from "@/hooks/UseRenderResources";
+import {
+  useRenderResources,
+  RenderPipelineResources,
+} from "@/hooks/UseRenderResources";
 
-
-const renderTriangle = (
+const renderPoints = (
   webGPUState: WebGPUState,
   resources: RenderPipelineResources
 ) => {
@@ -25,7 +27,8 @@ const renderTriangle = (
 
   pass.setPipeline(pipeline);
   pass.setVertexBuffer(0, vertexBuffer);
-  pass.draw(3);
+  const numPoints = 3;
+  pass.draw(6, numPoints); // since we're using instancing
   pass.end();
 
   device.queue.submit([encoder.finish()]);
@@ -43,7 +46,7 @@ export const WebGPUCanvas = () => {
   // Render effect
   useEffect(() => {
     if (!webGPUState || !renderResources) return;
-    renderTriangle(webGPUState, renderResources);
+    renderPoints(webGPUState, renderResources);
   }, [webGPUState, renderResources]);
 
   return <canvas ref={canvasRef} width={512} height={512} />;

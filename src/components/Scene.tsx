@@ -11,7 +11,7 @@ const renderPoints = (
   resources: RenderPipelineResources
 ) => {
   const { device, context } = webGPUState;
-  const { pipeline, vertexBuffer } = resources;
+  const { pipeline, vertexBuffer, indexBuffer } = resources;  // Add indexBuffer
 
   const encoder = device.createCommandEncoder();
   const pass = encoder.beginRenderPass({
@@ -27,8 +27,12 @@ const renderPoints = (
 
   pass.setPipeline(pipeline);
   pass.setVertexBuffer(0, vertexBuffer);
-  const numPoints = 3;
-  pass.draw(6, numPoints); // since we're using instancing
+  pass.setIndexBuffer(indexBuffer, 'uint32'); 
+
+  const gridSize = 10;
+  const numIndices = gridSize * gridSize * 6; //TODO: will change when we draw yz and xz planes
+  
+  pass.drawIndexed(numIndices); 
   pass.end();
 
   device.queue.submit([encoder.finish()]);

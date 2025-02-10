@@ -1,17 +1,11 @@
-"use client";
-import { useEffect, useRef } from "react";
-import { useWebGPU, WebGPUState } from "@/hooks/useWebGPU";
-import {
-  useRenderResources,
-  RenderPipelineResources,
-} from "@/hooks/UseRenderResources";
+'use client';
+import { useEffect, useRef } from 'react';
+import { useWebGPU, WebGPUState } from '@/hooks/useWebGPU';
+import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderResources';
 
-const renderPoints = (
-  webGPUState: WebGPUState,
-  resources: RenderPipelineResources
-) => {
+const renderPoints = (webGPUState: WebGPUState, resources: RenderPipelineResources) => {
   const { device, context } = webGPUState;
-  const { pipeline, vertexBuffer, indexBuffer } = resources;  // Add indexBuffer
+  const { pipeline, vertexBuffer, indexBuffer } = resources; // Add indexBuffer
 
   const encoder = device.createCommandEncoder();
   const pass = encoder.beginRenderPass({
@@ -19,20 +13,20 @@ const renderPoints = (
       {
         view: context.getCurrentTexture().createView(),
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        loadOp: "clear",
-        storeOp: "store",
+        loadOp: 'clear',
+        storeOp: 'store',
       },
     ],
   });
 
   pass.setPipeline(pipeline);
   pass.setVertexBuffer(0, vertexBuffer);
-  pass.setIndexBuffer(indexBuffer, 'uint32'); 
+  pass.setIndexBuffer(indexBuffer, 'uint32');
 
   const gridSize = 10;
-  const numIndices = gridSize * gridSize * 6; //TODO: will change when we draw yz and xz planes
-  
-  pass.drawIndexed(numIndices); 
+  const numIndices = 3 * gridSize * gridSize * 6; //TODO: will change when we draw yz and xz planes
+
+  pass.drawIndexed(numIndices);
   pass.end();
 
   device.queue.submit([encoder.finish()]);
@@ -42,7 +36,7 @@ const renderPoints = (
 export const WebGPUCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   if (!canvasRef) {
-    throw new Error("Canvas not found");
+    throw new Error('Canvas not found');
   }
   const webGPUState = useWebGPU(canvasRef);
   const renderResources = useRenderResources(webGPUState);

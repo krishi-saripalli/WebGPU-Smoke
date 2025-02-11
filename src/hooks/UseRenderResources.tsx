@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { WebGPUState } from './useWebGPU';
 import { shader } from '@/shaders/shader';
+import { Camera } from '@/modules/Camera';
+import { Vec3 } from 'gl-matrix';
 
 export interface RenderPipelineResources {
   pipeline: GPURenderPipeline; //  the VAO
   vertexBuffer: GPUBuffer; // the VBO
   indexBuffer: GPUBuffer;
+  uniformBuffer: GPUBuffer;
+  bindGroup: GPUBindGroup;
 }
 
 export const useRenderResources = (webGPUState: WebGPUState | null) => {
@@ -15,7 +19,51 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
     if (!webGPUState) return;
     const { device, canvasFormat } = webGPUState;
 
-    const gridSize = 10;
+    // Size is 2 4x4 matrices (view and projection) * 16 floats per matrix * 4 bytes per float
+    const uniformBuffer = device.createBuffer({
+      size: 2 * 16 * 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const camera = new Camera({
+      position: new Vec3([-2, 1.5, -4]),
+      lookAt: new Vec3([0, 0, 0]),
+      up: new Vec3([0, 1, 0]),
+      heightAngle: Math.PI / 3,
+      near: 0.1,
+      far: 100,
+      aspect: 1,
+    });
+
+    const viewMatrix = camera.getViewMatrix();
+    const projectionMatrix = camera.getProjectionMatrix();
+
+    device.queue.writeBuffer(uniformBuffer, 0, viewMatrix as Float32Array);
+    const offset = 16 * 4; // offset for projection matrix (after view matrix)
+    device.queue.writeBuffer(uniformBuffer, offset, projectionMatrix as Float32Array);
+
+    const bindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.VERTEX,
+          buffer: { type: 'uniform' },
+        },
+      ],
+    });
+
+    // Create bind group
+    const bindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: uniformBuffer },
+        },
+      ],
+    });
+
+    const gridSize = 4;
     const lineWidth = 0.005;
 
     // each line on each axis of the grid will be represented by a thin quad, which is 2 triangles (4 vertices)
@@ -26,7 +74,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
     for (let x = 0; x < gridSize; x++) {
       for (let y = 0; y < gridSize; y++) {
-        const zStart = 0.0;
+        const zStart = -1.0;
         const zEnd = 1.0;
         const xPos = -1.0 + 2.0 * (x / (gridSize - 1));
         const yPos = -1.0 + 2.0 * (y / (gridSize - 1));
@@ -59,7 +107,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const xStart = -1.0;
         const xEnd = 1.0;
         const yPos = -1.0 + 2.0 * (y / (gridSize - 1));
-        const zPos = z / (gridSize - 1);
+        const zPos = -1.0 + 2.0 * (z / (gridSize - 1));
 
         // four vertices for the line (rectangle)
         // top left
@@ -89,7 +137,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const yStart = -1.0;
         const yEnd = 1.0;
         const xPos = -1.0 + 2.0 * (x / (gridSize - 1));
-        const zPos = z / (gridSize - 1);
+        const zPos = -1.0 + 2.0 * (z / (gridSize - 1));
 
         // four vertices for the line (rectangle)
         // top left
@@ -143,9 +191,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
       indices[j++] = quadOffset + 3;
       indices[j++] = quadOffset + 1;
     }
-    console.log('Total indices generated:', j);
-    console.log('Expected indices:', indexCount);
-    console.log('Sample indices (first quad):', indices.slice(0, 6));
+
     const vertexBuffer = device.createBuffer({
       size: vertices.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -162,7 +208,9 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
     const shaderModule = device.createShaderModule({ code: shader });
     const pipeline = device.createRenderPipeline({
       label: 'Wireframe',
-      layout: 'auto',
+      layout: device.createPipelineLayout({
+        bindGroupLayouts: [bindGroupLayout],
+      }),
       vertex: {
         module: shaderModule,
         entryPoint: 'vertexMain',
@@ -188,9 +236,14 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
       primitive: {
         topology: 'triangle-list',
       },
+      depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+        format: 'depth24plus',
+      },
     });
 
-    setResources({ pipeline, vertexBuffer, indexBuffer });
+    setResources({ pipeline, vertexBuffer, indexBuffer, uniformBuffer, bindGroup });
   }, [webGPUState]);
 
   return resources;

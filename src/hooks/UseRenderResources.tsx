@@ -64,14 +64,16 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
     });
 
     const gridSize = 4;
-    const lineWidth = 0.005;
+    const lineWidth = 0.009;
 
     // each line on each axis of the grid will be represented by a thin quad, which is 2 triangles (4 vertices)
-    //TODO: DO the same for the y and z axes
+
     const vertexCount = 3 * gridSize * gridSize * 4;
     const vertices = new Float32Array(vertexCount * 3); // x, y, z
     let i = 0;
 
+
+    // z-aligned lines
     for (let x = 0; x < gridSize; x++) {
       for (let y = 0; y < gridSize; y++) {
         const zStart = -1.0;
@@ -102,6 +104,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
       }
     }
 
+    // x-aligned lines
     for (let y = 0; y < gridSize; y++) {
       for (let z = 0; z < gridSize; z++) {
         const xStart = -1.0;
@@ -109,7 +112,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const yPos = -1.0 + 2.0 * (y / (gridSize - 1));
         const zPos = -1.0 + 2.0 * (z / (gridSize - 1));
 
-        // four vertices for the line (rectangle)
+        // four vertices for the line (quad)
         // top left
         vertices[i++] = xStart;
         vertices[i++] = yPos + lineWidth;
@@ -132,6 +135,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
       }
     }
 
+    // y-aligned lines
     for (let z = 0; z < gridSize; z++) {
       for (let x = 0; x < gridSize; x++) {
         const yStart = -1.0;
@@ -141,12 +145,12 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         // four vertices for the line (rectangle)
         // top left
-        vertices[i++] = xPos;
+        vertices[i++] = xPos + lineWidth;
         vertices[i++] = yStart;
         vertices[i++] = zPos;
 
         // top right
-        vertices[i++] = xPos;
+        vertices[i++] = xPos + lineWidth;
         vertices[i++] = yEnd;
         vertices[i++] = zPos;
 
@@ -233,13 +237,11 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         entryPoint: 'fragmentMain',
         targets: [{ format: canvasFormat }],
       },
+      multisample: {
+        count: 4,
+      },
       primitive: {
         topology: 'triangle-list',
-      },
-      depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
-        format: 'depth24plus',
       },
     });
 

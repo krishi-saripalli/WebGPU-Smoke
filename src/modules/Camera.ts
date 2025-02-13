@@ -32,7 +32,6 @@ export class Camera {
   getViewMatrix(): Mat4 {
     const view = Mat4.create();
     Mat4.lookAt(view, this.position, this.lookAt, this.up);
-    console.log('View Matrix:', Array.from(view));
     return view;
   }
 

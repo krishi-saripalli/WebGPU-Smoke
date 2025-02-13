@@ -4,35 +4,27 @@ import { useWebGPU, WebGPUState } from '@/hooks/useWebGPU';
 import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderResources';
 
 const renderPoints = (webGPUState: WebGPUState, resources: RenderPipelineResources) => {
-  const { device, context } = webGPUState;
+  const { device, context, canvasFormat } = webGPUState;
   const { pipeline, vertexBuffer, indexBuffer, bindGroup } = resources; // Add indexBuffer
 
-  const depthTexture = device.createTexture({
-    size: {
-      width: context.getCurrentTexture().width,
-      height: context.getCurrentTexture().height,
-      depthOrArrayLayers: 1,
-    },
-    format: 'depth24plus',
+  const multisampleTexture = device.createTexture({
+    format: canvasFormat,
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    size: [context.getCurrentTexture().width, context.getCurrentTexture().height],
+    sampleCount: 4,
   });
 
   const encoder = device.createCommandEncoder();
   const pass = encoder.beginRenderPass({
     colorAttachments: [
       {
-        view: context.getCurrentTexture().createView(),
+        view: multisampleTexture.createView(),
+        resolveTarget: context.getCurrentTexture().createView(),
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
         loadOp: 'clear',
         storeOp: 'store',
       },
     ],
-    depthStencilAttachment: {
-      view: depthTexture.createView(),
-      depthClearValue: 1.0,
-      depthLoadOp: 'clear',
-      depthStoreOp: 'store',
-    },
   });
 
   pass.setPipeline(pipeline);

@@ -11,6 +11,7 @@ export interface RenderPipelineResources {
   uniformBuffer: GPUBuffer;
   bindGroup: GPUBindGroup;
   indexCount: number;
+  camera: Camera;
 }
 
 export const useRenderResources = (webGPUState: WebGPUState | null) => {
@@ -27,8 +28,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
     });
 
     const camera = new Camera({
-      position: new Vec3([-0, 0, 4]),
-      lookAt: new Vec3([0, 0, 0]),
+      position: new Vec3([0, 0, 4]),
+      forward: new Vec3([0, 0, -1]), // Looking down -Z axis
       up: new Vec3([0, 1, 0]),
       heightAngle: Math.PI / 3,
       near: 0.1,
@@ -53,7 +54,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
       ],
     });
 
-    // Create bind group
     const bindGroup = device.createBindGroup({
       layout: bindGroupLayout,
       entries: [
@@ -235,6 +235,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
       uniformBuffer,
       bindGroup,
       indexCount: indices.length,
+      camera,
     });
   }, [webGPUState]);
 

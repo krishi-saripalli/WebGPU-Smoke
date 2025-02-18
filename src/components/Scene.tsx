@@ -1,11 +1,11 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWebGPU, WebGPUState } from '@/hooks/useWebGPU';
 import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderResources';
 
 const renderPoints = (webGPUState: WebGPUState, resources: RenderPipelineResources) => {
   const { device, context, canvasFormat } = webGPUState;
-  const { pipeline, vertexBuffer, indexBuffer, bindGroup, indexCount } = resources; // Add indexBuffer
+  const { pipeline, vertexBuffer, indexBuffer, bindGroup, indexCount } = resources;
 
   const multisampleTexture = device.createTexture({
     format: canvasFormat,
@@ -43,13 +43,62 @@ export const WebGPUCanvas = () => {
   const webGPUState = useWebGPU(canvasRef as React.RefObject<HTMLCanvasElement>);
   const renderResources = useRenderResources(webGPUState);
 
-  // Render effect
+  const [isDragging, setIsDragging] = useState(false);
+  const [prevMousePos, setPrevMousePos] = useState<{ x: number; y: number } | null>(null);
+
+  // Mouse event handlers
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    setIsDragging(true);
+    setPrevMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setPrevMousePos(null);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging || !prevMousePos || !canvasRef.current || !renderResources) return;
+
+    const deltaX = e.clientX - prevMousePos.x;
+    const deltaY = e.clientY - prevMousePos.y;
+    setPrevMousePos({ x: e.clientX, y: e.clientY });
+
+    // Calculate rotation angles based on mouse movement
+    const angleX = (2.0 * deltaX) / canvasRef.current.width;
+    const angleY = (2.0 * deltaY) / canvasRef.current.height;
+
+    // Rotate camera
+    renderResources.camera.rotateCamera(angleX, angleY);
+
+    // Update view matrix uniform
+    const device = webGPUState?.device;
+    if (device) {
+      const viewMatrix = renderResources.camera.getViewMatrix();
+      device.queue.writeBuffer(renderResources.uniformBuffer, 0, viewMatrix as Float32Array);
+
+      // Trigger a re-render
+      renderPoints(webGPUState, renderResources);
+    }
+  };
+
   useEffect(() => {
     if (!canvasRef.current || !webGPUState || !renderResources) return;
     renderPoints(webGPUState, renderResources);
   }, [webGPUState, renderResources]);
 
-  return <canvas ref={canvasRef} width={1028} height={1028} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      width={1028}
+      height={1028}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onMouseMove={handleMouseMove}
+      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+    />
+  );
 };
 
 export default WebGPUCanvas;

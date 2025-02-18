@@ -10,6 +10,7 @@ export interface RenderPipelineResources {
   indexBuffer: GPUBuffer;
   uniformBuffer: GPUBuffer;
   bindGroup: GPUBindGroup;
+  indexCount: number;
 }
 
 export const useRenderResources = (webGPUState: WebGPUState | null) => {
@@ -26,7 +27,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
     });
 
     const camera = new Camera({
-      position: new Vec3([-2, 1.5, -4]),
+      position: new Vec3([-0, 0, 4]),
       lookAt: new Vec3([0, 0, 0]),
       up: new Vec3([0, 1, 0]),
       heightAngle: Math.PI / 3,
@@ -63,138 +64,120 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
       ],
     });
 
-    const gridSize = 4;
+    const gridSize = 8;
     const lineWidth = 0.009;
 
-    // each line on each axis of the grid will be represented by a thin quad, which is 2 triangles (4 vertices)
+    /////////////////////////////////////////////////////////////////////////
+    // Evenly space the points from -1 to +1 in (gridSize) steps
+    /////////////////////////////////////////////////////////////////////////
+    const positions: number[] = [];
+    for (let idx = 0; idx < gridSize; idx++) {
+      positions.push(-1.0 + (2.0 * idx) / (gridSize - 1));
+    }
 
-    const vertexCount = 3 * gridSize * gridSize * 4;
-    const vertices = new Float32Array(vertexCount * 3); // x, y, z
-    let i = 0;
+    /////////////////////////////////////////////////////////////////////////
+    // Build vertices and indices
+    // dynamically in arrays. Then convert them to typed arrays at the end.
+    /////////////////////////////////////////////////////////////////////////
+    const vertexPositions: number[] = [];
+    const indicesList: number[] = [];
 
+    // helper so we can add four vertices (quad) + six indices at once.
+    function addQuad(
+      p0: [number, number, number],
+      p1: [number, number, number],
+      p2: [number, number, number],
+      p3: [number, number, number]
+    ) {
+      // "startIndex" = how many vertices are in vertexPositions so far
+      const startIndex = vertexPositions.length / 3;
 
-    // z-aligned lines
-    for (let x = 0; x < gridSize; x++) {
-      for (let y = 0; y < gridSize; y++) {
-        const zStart = -1.0;
-        const zEnd = 1.0;
-        const xPos = -1.0 + 2.0 * (x / (gridSize - 1));
-        const yPos = -1.0 + 2.0 * (y / (gridSize - 1));
+      // Push the 4 corner vertices of this quad
+      vertexPositions.push(...p0, ...p1, ...p2, ...p3);
 
-        // four vertices for the line (rectangle)
-        // top left
-        vertices[i++] = xPos;
-        vertices[i++] = yPos + lineWidth;
-        vertices[i++] = zEnd;
+      // Add two triangles (6 indices) in CCW order:
+      //   0--1
+      //   | /|
+      //   2--3
+      indicesList.push(
+        startIndex + 0,
+        startIndex + 2,
+        startIndex + 1,
+        startIndex + 2,
+        startIndex + 3,
+        startIndex + 1
+      );
+    }
 
-        // top right
-        vertices[i++] = xPos;
-        vertices[i++] = yPos + lineWidth;
-        vertices[i++] = zStart;
+    ///////////////////////////////////////////////////////////////////////////////
+    // z-aligned lines: x,y vary, z goes from -1 to +1.
+    // Only draw the quad if we are on the boundary plane (|x|=1 or |y|=1).
+    ///////////////////////////////////////////////////////////////////////////////
+    for (let x of positions) {
+      for (let y of positions) {
+        if (Math.abs(x) === 1 || Math.abs(y) === 1) {
+          const zStart = -1.0;
+          const zEnd = 1.0;
 
-        // bottom left
-        vertices[i++] = xPos;
-        vertices[i++] = yPos - lineWidth;
-        vertices[i++] = zEnd;
+          // top-left, top-right, bottom-left, bottom-right
+          const p0: [number, number, number] = [x, y + lineWidth, zEnd];
+          const p1: [number, number, number] = [x, y + lineWidth, zStart];
+          const p2: [number, number, number] = [x, y - lineWidth, zEnd];
+          const p3: [number, number, number] = [x, y - lineWidth, zStart];
 
-        // bottom right
-        vertices[i++] = xPos;
-        vertices[i++] = yPos - lineWidth;
-        vertices[i++] = zStart;
+          addQuad(p0, p1, p2, p3);
+        }
       }
     }
 
-    // x-aligned lines
-    for (let y = 0; y < gridSize; y++) {
-      for (let z = 0; z < gridSize; z++) {
-        const xStart = -1.0;
-        const xEnd = 1.0;
-        const yPos = -1.0 + 2.0 * (y / (gridSize - 1));
-        const zPos = -1.0 + 2.0 * (z / (gridSize - 1));
+    ///////////////////////////////////////////////////////////////////////////////
+    // x-aligned lines: y,z vary, x goes from -1 to +1.
+    // Only draw if we're on the boundary plane (|y|=1 or |z|=1).
+    ///////////////////////////////////////////////////////////////////////////////
+    for (let y of positions) {
+      for (let z of positions) {
+        if (Math.abs(y) === 1 || Math.abs(z) === 1) {
+          const xStart = -1.0;
+          const xEnd = 1.0;
 
-        // four vertices for the line (quad)
-        // top left
-        vertices[i++] = xStart;
-        vertices[i++] = yPos + lineWidth;
-        vertices[i++] = zPos;
+          const p0: [number, number, number] = [xStart, y + lineWidth, z];
+          const p1: [number, number, number] = [xEnd, y + lineWidth, z];
+          const p2: [number, number, number] = [xStart, y - lineWidth, z];
+          const p3: [number, number, number] = [xEnd, y - lineWidth, z];
 
-        // top right
-        vertices[i++] = xEnd;
-        vertices[i++] = yPos + lineWidth;
-        vertices[i++] = zPos;
-
-        // bottom left
-        vertices[i++] = xStart;
-        vertices[i++] = yPos - lineWidth;
-        vertices[i++] = zPos;
-
-        // bottom right
-        vertices[i++] = xEnd;
-        vertices[i++] = yPos - lineWidth;
-        vertices[i++] = zPos;
+          addQuad(p0, p1, p2, p3);
+        }
       }
     }
 
-    // y-aligned lines
-    for (let z = 0; z < gridSize; z++) {
-      for (let x = 0; x < gridSize; x++) {
-        const yStart = -1.0;
-        const yEnd = 1.0;
-        const xPos = -1.0 + 2.0 * (x / (gridSize - 1));
-        const zPos = -1.0 + 2.0 * (z / (gridSize - 1));
+    ///////////////////////////////////////////////////////////////////////////////
+    // y-aligned lines: x,z vary, y goes from -1 to +1.
+    // Only draw if we're on the boundary plane (|x|=1 or |z|=1).
+    ///////////////////////////////////////////////////////////////////////////////
+    for (let z of positions) {
+      for (let x of positions) {
+        if (Math.abs(z) === 1 || Math.abs(x) === 1) {
+          const yStart = -1.0;
+          const yEnd = 1.0;
 
-        // four vertices for the line (rectangle)
-        // top left
-        vertices[i++] = xPos + lineWidth;
-        vertices[i++] = yStart;
-        vertices[i++] = zPos;
+          const p0: [number, number, number] = [x + lineWidth, yStart, z];
+          const p1: [number, number, number] = [x + lineWidth, yEnd, z];
+          const p2: [number, number, number] = [x - lineWidth, yStart, z];
+          const p3: [number, number, number] = [x - lineWidth, yEnd, z];
 
-        // top right
-        vertices[i++] = xPos + lineWidth;
-        vertices[i++] = yEnd;
-        vertices[i++] = zPos;
-
-        // bottom left
-        vertices[i++] = xPos - lineWidth;
-        vertices[i++] = yStart;
-        vertices[i++] = zPos;
-
-        // bottom right
-        vertices[i++] = xPos - lineWidth;
-        vertices[i++] = yEnd;
-        vertices[i++] = zPos;
+          addQuad(p0, p1, p2, p3);
+        }
       }
     }
 
-    console.log('Total vertices generated:', i);
-    console.log('Expected vertices:', vertexCount * 3);
-    console.log('Sample vertices (first quad):', vertices.slice(0, 12));
+    ////////////////////////////////////////////////////////////////////////////////
+    // convert the vertex & index arrays into typed arrays
+    ////////////////////////////////////////////////////////////////////////////////
+    const vertices = new Float32Array(vertexPositions);
+    const indices = new Uint32Array(indicesList);
 
-    // e have (3 * gridSize * gridSize) quads total
-    // each quad needs 6 indices
-    const indexCount = 3 * gridSize * gridSize * 6;
-    const indices = new Uint32Array(indexCount); // 0 - 5
-    let j = 0;
-    // map indices to the vertices (counterclockwise)
-    // 0 -----.1
-    // |   .   |
-    // | .     |
-    // 2 ------ 3
-
-    const quadCount = 3 * gridSize * gridSize;
-    for (let i = 0; i < quadCount; i += 1) {
-      const quadOffset = i * 4;
-
-      // first triangle
-      indices[j++] = quadOffset + 0;
-      indices[j++] = quadOffset + 2;
-      indices[j++] = quadOffset + 1;
-
-      // second triangle
-      indices[j++] = quadOffset + 2;
-      indices[j++] = quadOffset + 3;
-      indices[j++] = quadOffset + 1;
-    }
+    console.log('Vertices count:', vertices.length / 3);
+    console.log('Quads count:', indices.length / 6);
 
     const vertexBuffer = device.createBuffer({
       size: vertices.byteLength,
@@ -245,7 +228,14 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
       },
     });
 
-    setResources({ pipeline, vertexBuffer, indexBuffer, uniformBuffer, bindGroup });
+    setResources({
+      pipeline,
+      vertexBuffer,
+      indexBuffer,
+      uniformBuffer,
+      bindGroup,
+      indexCount: indices.length,
+    });
   }, [webGPUState]);
 
   return resources;

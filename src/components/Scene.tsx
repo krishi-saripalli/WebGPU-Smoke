@@ -5,7 +5,7 @@ import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderRe
 
 const renderPoints = (webGPUState: WebGPUState, resources: RenderPipelineResources) => {
   const { device, context, canvasFormat } = webGPUState;
-  const { pipeline, vertexBuffer, indexBuffer, bindGroup } = resources; // Add indexBuffer
+  const { pipeline, vertexBuffer, indexBuffer, bindGroup, indexCount } = resources; // Add indexBuffer
 
   const multisampleTexture = device.createTexture({
     format: canvasFormat,
@@ -31,10 +31,7 @@ const renderPoints = (webGPUState: WebGPUState, resources: RenderPipelineResourc
   pass.setVertexBuffer(0, vertexBuffer);
   pass.setIndexBuffer(indexBuffer, 'uint32');
   pass.setBindGroup(0, bindGroup);
-  const gridSize = 4;
-  const numIndices = 3 * gridSize * gridSize * 6;
-
-  pass.drawIndexed(numIndices);
+  pass.drawIndexed(indexCount);
   pass.end();
 
   device.queue.submit([encoder.finish()]);

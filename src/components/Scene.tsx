@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWebGPU, WebGPUState } from '@/hooks/useWebGPU';
 import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderResources';
+import { updateCameraPosition, updateCameraRotation } from '@/utils/cameraMovement';
 
 const renderPoints = (webGPUState: WebGPUState, resources: RenderPipelineResources) => {
   const { device, context, canvasFormat } = webGPUState;
@@ -42,9 +43,60 @@ export const WebGPUCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const webGPUState = useWebGPU(canvasRef as React.RefObject<HTMLCanvasElement>);
   const renderResources = useRenderResources(webGPUState);
-
+  const [pressedKeys, setPressedKeys] = useState(new Set<string>());
   const [isDragging, setIsDragging] = useState(false);
   const [prevMousePos, setPrevMousePos] = useState<{ x: number; y: number } | null>(null);
+
+  // Handle keyboard input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      setPressedKeys((prev) => new Set(prev).add(e.key.toLowerCase()));
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      setPressedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(e.key.toLowerCase());
+        return next;
+      });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Movement update loop
+  useEffect(() => {
+    if (!renderResources) return;
+
+    const moveCamera = () => {
+      const didMove = updateCameraPosition(renderResources.camera, pressedKeys);
+
+      if (didMove && webGPUState?.device) {
+        const viewMatrix = renderResources.camera.getViewMatrix();
+        webGPUState.device.queue.writeBuffer(
+          renderResources.uniformBuffer,
+          0,
+          viewMatrix as Float32Array
+        );
+        renderPoints(webGPUState, renderResources);
+      }
+    };
+
+    let animationFrameId: number;
+    function animate() {
+      moveCamera();
+      animationFrameId = requestAnimationFrame(animate);
+    }
+
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [renderResources, webGPUState, pressedKeys]);
 
   // Mouse event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -64,20 +116,18 @@ export const WebGPUCanvas = () => {
     const deltaY = e.clientY - prevMousePos.y;
     setPrevMousePos({ x: e.clientX, y: e.clientY });
 
-    // Calculate rotation angles based on mouse movement
-    const angleX = (2.0 * deltaX) / canvasRef.current.width;
-    const angleY = (2.0 * deltaY) / canvasRef.current.height;
+    updateCameraRotation(
+      renderResources.camera,
+      deltaX,
+      deltaY,
+      canvasRef.current.width,
+      canvasRef.current.height
+    );
 
-    // Rotate camera
-    renderResources.camera.rotateCamera(angleX, angleY);
-
-    // Update view matrix uniform
     const device = webGPUState?.device;
     if (device) {
       const viewMatrix = renderResources.camera.getViewMatrix();
       device.queue.writeBuffer(renderResources.uniformBuffer, 0, viewMatrix as Float32Array);
-
-      // Trigger a re-render
       renderPoints(webGPUState, renderResources);
     }
   };
@@ -97,6 +147,7 @@ export const WebGPUCanvas = () => {
       onMouseLeave={handleMouseUp}
       onMouseMove={handleMouseMove}
       style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      tabIndex={0}
     />
   );
 };

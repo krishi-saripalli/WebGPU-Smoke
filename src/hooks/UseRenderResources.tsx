@@ -28,10 +28,10 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
     });
 
     const camera = new Camera({
-      position: new Vec3([0, 0, 4]),
-      forward: new Vec3([0, 0, -1]), // Looking down -Z axis
+      position: new Vec3([0, 1, 4]),
+      forward: new Vec3([0, 0, -1]),
       up: new Vec3([0, 1, 0]),
-      heightAngle: Math.PI / 3,
+      heightAngle: Math.PI / 2,
       near: 0.1,
       far: 100,
       aspect: 1,

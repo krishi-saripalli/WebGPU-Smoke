@@ -2,11 +2,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWebGPU, WebGPUState } from '@/hooks/useWebGPU';
 import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderResources';
+import { useComputeResources, ComputePipelineResources } from '@/hooks/useComputeResources';
 import { updateCameraPosition, updateCameraRotation } from '@/utils/cameraMovement';
+import { vec3 } from 'gl-matrix';
 
-const renderPoints = (webGPUState: WebGPUState, resources: RenderPipelineResources) => {
+const renderScene = (
+  webGPUState: WebGPUState,
+  renderResources: RenderPipelineResources,
+  computeResources: ComputePipelineResources
+) => {
   const { device, context, canvasFormat } = webGPUState;
-  const { pipeline, vertexBuffer, indexBuffer, bindGroup, indexCount } = resources;
+  const { pipeline, vertexBuffer, indexBuffer, renderBindGroup, indexCount } = renderResources;
+  const { computePipeline, computeBindGroup, gridSize } = computeResources;
 
   const multisampleTexture = device.createTexture({
     format: canvasFormat,
@@ -16,7 +23,21 @@ const renderPoints = (webGPUState: WebGPUState, resources: RenderPipelineResourc
   });
 
   const encoder = device.createCommandEncoder();
-  const pass = encoder.beginRenderPass({
+
+  // Compute pass
+  const workgroupSize = [4, 4, 4];
+  const numWorkgroups = [
+    Math.ceil(gridSize / workgroupSize[0]),
+    Math.ceil(gridSize / workgroupSize[1]),
+    Math.ceil(gridSize / workgroupSize[2]),
+  ];
+  const computePass = encoder.beginComputePass();
+  computePass.setPipeline(computePipeline);
+  computePass.setBindGroup(0, computeBindGroup);
+  computePass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  computePass.end();
+
+  const renderPass = encoder.beginRenderPass({
     colorAttachments: [
       {
         view: multisampleTexture.createView(),
@@ -28,26 +49,25 @@ const renderPoints = (webGPUState: WebGPUState, resources: RenderPipelineResourc
     ],
   });
 
-  pass.setPipeline(pipeline);
-  pass.setVertexBuffer(0, vertexBuffer);
-  pass.setIndexBuffer(indexBuffer, 'uint32');
-  pass.setBindGroup(0, bindGroup);
-  pass.drawIndexed(indexCount);
-  pass.end();
+  renderPass.setPipeline(pipeline);
+  renderPass.setVertexBuffer(0, vertexBuffer);
+  renderPass.setIndexBuffer(indexBuffer, 'uint32');
+  renderPass.setBindGroup(0, renderBindGroup);
+  renderPass.drawIndexed(indexCount);
+  renderPass.end();
 
   device.queue.submit([encoder.finish()]);
 };
 
-// Main component
 export const WebGPUCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const webGPUState = useWebGPU(canvasRef as React.RefObject<HTMLCanvasElement>);
   const renderResources = useRenderResources(webGPUState);
+  const computeResources = useComputeResources(webGPUState);
   const [pressedKeys, setPressedKeys] = useState(new Set<string>());
   const [isDragging, setIsDragging] = useState(false);
   const [prevMousePos, setPrevMousePos] = useState<{ x: number; y: number } | null>(null);
 
-  // Handle keyboard input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       setPressedKeys((prev) => new Set(prev).add(e.key.toLowerCase()));
@@ -70,9 +90,8 @@ export const WebGPUCanvas = () => {
     };
   }, []);
 
-  // Movement update loop
   useEffect(() => {
-    if (!renderResources) return;
+    if (!renderResources || !computeResources) return;
 
     const moveCamera = () => {
       const didMove = updateCameraPosition(renderResources.camera, pressedKeys);
@@ -84,7 +103,7 @@ export const WebGPUCanvas = () => {
           0,
           viewMatrix as Float32Array
         );
-        renderPoints(webGPUState, renderResources);
+        renderScene(webGPUState, renderResources, computeResources);
       }
     };
 
@@ -96,9 +115,8 @@ export const WebGPUCanvas = () => {
 
     animationFrameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [renderResources, webGPUState, pressedKeys]);
+  }, [renderResources, computeResources, webGPUState, pressedKeys]);
 
-  // Mouse event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDragging(true);
     setPrevMousePos({ x: e.clientX, y: e.clientY });
@@ -110,7 +128,8 @@ export const WebGPUCanvas = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || !prevMousePos || !canvasRef.current || !renderResources) return;
+    if (!isDragging || !prevMousePos || !canvasRef.current || !renderResources || !computeResources)
+      return;
 
     const deltaX = e.clientX - prevMousePos.x;
     const deltaY = e.clientY - prevMousePos.y;
@@ -128,14 +147,14 @@ export const WebGPUCanvas = () => {
     if (device) {
       const viewMatrix = renderResources.camera.getViewMatrix();
       device.queue.writeBuffer(renderResources.uniformBuffer, 0, viewMatrix as Float32Array);
-      renderPoints(webGPUState, renderResources);
+      renderScene(webGPUState, renderResources, computeResources);
     }
   };
 
   useEffect(() => {
-    if (!canvasRef.current || !webGPUState || !renderResources) return;
-    renderPoints(webGPUState, renderResources);
-  }, [webGPUState, renderResources]);
+    if (!canvasRef.current || !webGPUState || !renderResources || !computeResources) return;
+    renderScene(webGPUState, renderResources, computeResources);
+  }, [webGPUState, renderResources, computeResources]);
 
   return (
     <canvas

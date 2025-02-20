@@ -4,9 +4,8 @@ struct Uniforms {
 }
 
 
-
 @binding(0) @group(0) var<uniform> uniforms: Uniforms;
-
+@binding(1) @group(0) var<storage, read_write> density: array<f32>;
 struct VertexInput {
   @location(0) position: vec3f,
 };
@@ -27,5 +26,12 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 @fragment
 fn fragmentMain(vertexOut: VertexOutput) -> @location(0) vec4f {
   return vec4f(1.0, 0.0, 0.0, 1.0);
+}
+
+
+    
+@compute @workgroup_size(4,4,4)
+fn computeMain() {
+    density[0] = 1.0;
 }
 

@@ -2,18 +2,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWebGPU, WebGPUState } from '@/hooks/useWebGPU';
 import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderResources';
-import { useComputeResources, ComputePipelineResources } from '@/hooks/useComputeResources';
 import { updateCameraPosition, updateCameraRotation } from '@/utils/cameraMovement';
-import { vec3 } from 'gl-matrix';
 
-const renderScene = (
-  webGPUState: WebGPUState,
-  renderResources: RenderPipelineResources,
-  computeResources: ComputePipelineResources
-) => {
+const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineResources) => {
   const { device, context, canvasFormat } = webGPUState;
-  const { pipeline, vertexBuffer, indexBuffer, renderBindGroup, indexCount } = renderResources;
-  const { computePipeline, computeBindGroup, gridSize } = computeResources;
+  const {
+    renderPipeline,
+    computePipeline,
+    vertexBuffer,
+    indexBuffer,
+    bindGroup,
+    indexCount,
+    gridSize,
+  } = renderResources;
 
   const multisampleTexture = device.createTexture({
     format: canvasFormat,
@@ -33,7 +34,7 @@ const renderScene = (
   ];
   const computePass = encoder.beginComputePass();
   computePass.setPipeline(computePipeline);
-  computePass.setBindGroup(0, computeBindGroup);
+  computePass.setBindGroup(0, bindGroup);
   computePass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   computePass.end();
 
@@ -49,10 +50,10 @@ const renderScene = (
     ],
   });
 
-  renderPass.setPipeline(pipeline);
+  renderPass.setPipeline(renderPipeline);
   renderPass.setVertexBuffer(0, vertexBuffer);
   renderPass.setIndexBuffer(indexBuffer, 'uint32');
-  renderPass.setBindGroup(0, renderBindGroup);
+  renderPass.setBindGroup(0, bindGroup);
   renderPass.drawIndexed(indexCount);
   renderPass.end();
 
@@ -63,7 +64,6 @@ export const WebGPUCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const webGPUState = useWebGPU(canvasRef as React.RefObject<HTMLCanvasElement>);
   const renderResources = useRenderResources(webGPUState);
-  const computeResources = useComputeResources(webGPUState);
   const [pressedKeys, setPressedKeys] = useState(new Set<string>());
   const [isDragging, setIsDragging] = useState(false);
   const [prevMousePos, setPrevMousePos] = useState<{ x: number; y: number } | null>(null);
@@ -91,7 +91,7 @@ export const WebGPUCanvas = () => {
   }, []);
 
   useEffect(() => {
-    if (!renderResources || !computeResources) return;
+    if (!renderResources) return;
 
     const moveCamera = () => {
       const didMove = updateCameraPosition(renderResources.camera, pressedKeys);
@@ -103,7 +103,7 @@ export const WebGPUCanvas = () => {
           0,
           viewMatrix as Float32Array
         );
-        renderScene(webGPUState, renderResources, computeResources);
+        renderScene(webGPUState, renderResources);
       }
     };
 
@@ -115,7 +115,7 @@ export const WebGPUCanvas = () => {
 
     animationFrameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [renderResources, computeResources, webGPUState, pressedKeys]);
+  }, [renderResources, webGPUState, pressedKeys]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDragging(true);
@@ -128,8 +128,7 @@ export const WebGPUCanvas = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || !prevMousePos || !canvasRef.current || !renderResources || !computeResources)
-      return;
+    if (!isDragging || !prevMousePos || !canvasRef.current || !renderResources) return;
 
     const deltaX = e.clientX - prevMousePos.x;
     const deltaY = e.clientY - prevMousePos.y;
@@ -147,14 +146,14 @@ export const WebGPUCanvas = () => {
     if (device) {
       const viewMatrix = renderResources.camera.getViewMatrix();
       device.queue.writeBuffer(renderResources.uniformBuffer, 0, viewMatrix as Float32Array);
-      renderScene(webGPUState, renderResources, computeResources);
+      renderScene(webGPUState, renderResources);
     }
   };
 
   useEffect(() => {
-    if (!canvasRef.current || !webGPUState || !renderResources || !computeResources) return;
-    renderScene(webGPUState, renderResources, computeResources);
-  }, [webGPUState, renderResources, computeResources]);
+    if (!canvasRef.current || !webGPUState || !renderResources) return;
+    renderScene(webGPUState, renderResources);
+  }, [webGPUState, renderResources]);
 
   return (
     <canvas

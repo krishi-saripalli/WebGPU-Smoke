@@ -39,8 +39,11 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         // Uniform buffer
         /////////////////////////////////////////////////////////////////////////
         // Size is 2 4x4 matrices (view and projection) * 16 floats per matrix * 4 bytes per float
+        // + 2 u32s * 4 bytes per u32 + 8 bytes for padding to make it 16 byte aligned
+        // prettier-ignore
+        const uniformBufferSize = (2 * 16 * 4) + (2 * 4) + 8;
         const uniformBuffer = device.createBuffer({
-          size: 2 * 16 * 4,
+          size: uniformBufferSize,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
@@ -58,30 +61,58 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const projectionMatrix = camera.getProjectionMatrix();
 
         device.queue.writeBuffer(uniformBuffer, 0, viewMatrix as Float32Array);
-        const offset = 16 * 4; // offset for projection matrix (after view matrix)
-        device.queue.writeBuffer(uniformBuffer, offset, projectionMatrix as Float32Array);
+        device.queue.writeBuffer(uniformBuffer, 16 * 4, projectionMatrix as Float32Array); // offset for projection matrix (after view matrix)
+        device.queue.writeBuffer(uniformBuffer, 2 * 16 * 4, new Uint32Array([gridSize, gridSize]));
 
         /////////////////////////////////////////////////////////////////////////
-        // Density buffer
+        // Density texture
         /////////////////////////////////////////////////////////////////////////
-        const densityBuffer = device.createBuffer({
-          size: gridSize * gridSize * gridSize * 4, // 4 bytes per float
-          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        const densityTexture = device.createTexture({
+          size: [gridSize, gridSize, gridSize],
+          dimension: '3d',
+          format: 'rgba16float',
+          usage:
+            GPUTextureUsage.TEXTURE_BINDING |
+            GPUTextureUsage.STORAGE_BINDING |
+            GPUTextureUsage.COPY_DST,
         });
 
         const bindGroupLayout = device.createBindGroupLayout({
           entries: [
             {
               binding: 0,
-              visibility: GPUShaderStage.VERTEX,
+              visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
               buffer: { type: 'uniform' },
             },
             {
               binding: 1,
-              visibility: GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT,
-              buffer: { type: 'storage' },
+              visibility: GPUShaderStage.COMPUTE,
+              storageTexture: {
+                access: 'write-only',
+                format: 'rgba16float',
+                viewDimension: '3d',
+              },
+            },
+            {
+              binding: 2,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: {
+                sampleType: 'float',
+                viewDimension: '3d',
+              },
+            },
+            {
+              binding: 3,
+              visibility: GPUShaderStage.FRAGMENT,
+              sampler: { type: 'filtering' },
             },
           ],
+        });
+
+        const sampler = device.createSampler({
+          magFilter: 'linear',
+          minFilter: 'linear',
+          mipmapFilter: 'linear',
         });
 
         const bindGroup = device.createBindGroup({
@@ -93,7 +124,15 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
             },
             {
               binding: 1,
-              resource: { buffer: densityBuffer },
+              resource: densityTexture.createView(),
+            },
+            {
+              binding: 2,
+              resource: densityTexture.createView(),
+            },
+            {
+              binding: 3,
+              resource: sampler,
             },
           ],
         });

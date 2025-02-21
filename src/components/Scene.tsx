@@ -23,7 +23,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
     sampleCount: 4,
   });
 
-  const encoder = device.createCommandEncoder();
+  const computeEncoder = device.createCommandEncoder();
 
   // Compute pass
   const workgroupSize = [4, 4, 4];
@@ -32,13 +32,18 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
     Math.ceil(gridSize / workgroupSize[1]),
     Math.ceil(gridSize / workgroupSize[2]),
   ];
-  const computePass = encoder.beginComputePass();
+
+  const computePass = computeEncoder.beginComputePass();
   computePass.setPipeline(computePipeline);
   computePass.setBindGroup(0, bindGroup);
   computePass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   computePass.end();
 
-  const renderPass = encoder.beginRenderPass({
+  device.queue.submit([computeEncoder.finish()]);
+  device.queue.onSubmittedWorkDone();
+
+  const renderEncoder = device.createCommandEncoder();
+  const renderPass = renderEncoder.beginRenderPass({
     colorAttachments: [
       {
         view: multisampleTexture.createView(),
@@ -57,7 +62,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   renderPass.drawIndexed(indexCount);
   renderPass.end();
 
-  device.queue.submit([encoder.finish()]);
+  device.queue.submit([renderEncoder.finish()]);
 };
 
 export const WebGPUCanvas = () => {

@@ -6,7 +6,6 @@ struct Uniforms {
   
 }
 
-
 @group(0) @binding(0)  var<uniform> uniforms: Uniforms;
 
 struct VertexInput {
@@ -29,29 +28,36 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   return output;
 }
 
-@group(0) @binding(1) var densityTexture: texture_storage_3d<rgba16float, write>; //write only
+@group(0) @binding(1) var srcDensity: texture_3d<f32>;
+@group(0)@binding(2) var dstDensity: texture_storage_3d<rgba16float, write>;
 
-// For fragment shader (reading)
-@group(0) @binding(2) var densityTextureView: texture_3d<f32>; //read only
-@group(0) @binding(3) var densitySampler: sampler;
+@group(0) @binding(3) var densityView: texture_3d<f32>;
+@group(0) @binding(4) var densitySampler: sampler;
 
 @fragment
 fn fragmentMain(vertexOut: VertexOutput) -> @location(0) vec4f {
-  // Use densityTextureView instead of densityTexture for sampling
-  let density = textureSample(densityTextureView, densitySampler, vertexOut.texCoord);
+  let density = textureSample(densityView, densitySampler, vertexOut.texCoord);
   return vec4f(1.0, 0.0, 0.0, density.x); // red smoke
 }
 
 @compute @workgroup_size(4,4,4)
 fn computeMain(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (id.x >= uniforms.gridSize || 
+        id.y >= uniforms.gridSize || 
+        id.z >= uniforms.gridSize) {
+        return;
+    }
+
     let gridCenter = vec3<u32>(uniforms.gridSize / 2u);
+
+    //let input = textureLoad(srcDensity, id, 0);
     
     if (id.x == gridCenter.x && 
         id.y == gridCenter.y && 
         id.z == gridCenter.z) {
-        textureStore(densityTexture, id, vec4f(1.0));
+        textureStore(dstDensity, id, vec4f(1.0));
     } else {
-        textureStore(densityTexture, id, vec4f(0.0));
+        textureStore(dstDensity, id, vec4f(0.0));
     }
 }
 

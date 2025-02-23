@@ -11,7 +11,9 @@ export interface RenderPipelineResources {
   vertexBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
   uniformBuffer: GPUBuffer;
-  bindGroup: GPUBindGroup;
+  multisampleTexture: GPUTexture;
+  bindGroupA: GPUBindGroup;
+  bindGroupB: GPUBindGroup;
   indexCount: number;
   camera: Camera;
   gridSize: number;
@@ -65,9 +67,19 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         device.queue.writeBuffer(uniformBuffer, 2 * 16 * 4, new Uint32Array([gridSize, gridSize]));
 
         /////////////////////////////////////////////////////////////////////////
-        // Density texture
+        // Density texture A
         /////////////////////////////////////////////////////////////////////////
-        const densityTexture = device.createTexture({
+        const densityTextureA = device.createTexture({
+          size: [gridSize, gridSize, gridSize],
+          dimension: '3d',
+          format: 'rgba16float',
+          usage:
+            GPUTextureUsage.TEXTURE_BINDING |
+            GPUTextureUsage.STORAGE_BINDING |
+            GPUTextureUsage.COPY_DST,
+        });
+
+        const densityTextureB = device.createTexture({
           size: [gridSize, gridSize, gridSize],
           dimension: '3d',
           format: 'rgba16float',
@@ -87,6 +99,14 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
             {
               binding: 1,
               visibility: GPUShaderStage.COMPUTE,
+              texture: {
+                sampleType: 'float',
+                viewDimension: '3d',
+              },
+            },
+            {
+              binding: 2,
+              visibility: GPUShaderStage.COMPUTE,
               storageTexture: {
                 access: 'write-only',
                 format: 'rgba16float',
@@ -94,7 +114,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
               },
             },
             {
-              binding: 2,
+              binding: 3,
               visibility: GPUShaderStage.FRAGMENT,
               texture: {
                 sampleType: 'float',
@@ -102,7 +122,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
               },
             },
             {
-              binding: 3,
+              binding: 4,
               visibility: GPUShaderStage.FRAGMENT,
               sampler: { type: 'filtering' },
             },
@@ -115,7 +135,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           mipmapFilter: 'linear',
         });
 
-        const bindGroup = device.createBindGroup({
+        const bindGroupA = device.createBindGroup({
           layout: bindGroupLayout,
           entries: [
             {
@@ -124,14 +144,44 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
             },
             {
               binding: 1,
-              resource: densityTexture.createView(),
+              resource: densityTextureA.createView(),
             },
             {
               binding: 2,
-              resource: densityTexture.createView(),
+              resource: densityTextureB.createView(),
             },
             {
               binding: 3,
+              resource: densityTextureA.createView(),
+            },
+            {
+              binding: 4,
+              resource: sampler,
+            },
+          ],
+        });
+
+        const bindGroupB = device.createBindGroup({
+          layout: bindGroupLayout,
+          entries: [
+            {
+              binding: 0,
+              resource: { buffer: uniformBuffer },
+            },
+            {
+              binding: 1,
+              resource: densityTextureB.createView(),
+            },
+            {
+              binding: 2,
+              resource: densityTextureA.createView(),
+            },
+            {
+              binding: 3,
+              resource: densityTextureB.createView(),
+            },
+            {
+              binding: 4,
               resource: sampler,
             },
           ],
@@ -219,13 +269,28 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           },
         });
 
+        /////////////////////////////////////////////////////////////////////////
+        // Multisample texture
+        /////////////////////////////////////////////////////////////////////////
+        const multisampleTexture = device.createTexture({
+          format: canvasFormat,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT,
+          size: [
+            webGPUState.context.getCurrentTexture().width,
+            webGPUState.context.getCurrentTexture().height,
+          ],
+          sampleCount: 4,
+        });
+
         setResources({
           renderPipeline,
           computePipeline,
           vertexBuffer,
           indexBuffer,
           uniformBuffer,
-          bindGroup,
+          multisampleTexture,
+          bindGroupA,
+          bindGroupB,
           indexCount: indices.length,
           camera,
           gridSize,

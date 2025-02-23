@@ -3,8 +3,8 @@ import { Camera } from '@/modules/Camera';
 
 export const MOVEMENT_SPEED = 0.01;
 
-export function updateCameraPosition(camera: Camera, pressedKeys: Set<string>): boolean {
-  if (pressedKeys.size === 0) return false;
+export function updateCameraPosition(camera: Camera, pressedKeys: Set<string>): void {
+  if (pressedKeys.size === 0) return;
 
   const position = camera.getPosition();
   const forward = camera.getForward();
@@ -12,24 +12,23 @@ export function updateCameraPosition(camera: Camera, pressedKeys: Set<string>): 
   const newPosition = vec3.clone(position);
 
   // Forward/Backward
-  if (pressedKeys.has('w')) {
+  if (pressedKeys.has('KeyW')) {
     vec3.scaleAndAdd(newPosition, newPosition, forward, MOVEMENT_SPEED);
   }
-  if (pressedKeys.has('s')) {
+  if (pressedKeys.has('KeyS')) {
     vec3.scaleAndAdd(newPosition, newPosition, forward, -MOVEMENT_SPEED);
   }
 
   // Left/Right
-  if (pressedKeys.has('a')) {
+  if (pressedKeys.has('KeyA')) {
     vec3.scaleAndAdd(newPosition, newPosition, right, -MOVEMENT_SPEED);
   }
-  if (pressedKeys.has('d')) {
+  if (pressedKeys.has('KeyD')) {
     vec3.scaleAndAdd(newPosition, newPosition, right, MOVEMENT_SPEED);
   }
 
   // Update camera position
   vec3.copy(position, newPosition);
-  return true;
 }
 
 export function updateCameraRotation(

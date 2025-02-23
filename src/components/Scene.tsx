@@ -1,27 +1,33 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWebGPU, WebGPUState } from '@/hooks/useWebGPU';
 import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderResources';
 import { updateCameraPosition, updateCameraRotation } from '@/utils/cameraMovement';
+import {
+  handleKeyDown,
+  handleKeyUp,
+  handleMouseDown,
+  handleMouseMove,
+  handleMouseUp,
+} from '@/utils/inputHandler';
 
-const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineResources) => {
+const renderScene = (
+  webGPUState: WebGPUState,
+  renderResources: RenderPipelineResources,
+  shouldSwapBindGroups: boolean
+) => {
   const { device, context, canvasFormat } = webGPUState;
   const {
     renderPipeline,
     computePipeline,
     vertexBuffer,
     indexBuffer,
-    bindGroup,
+    multisampleTexture,
+    bindGroupA,
+    bindGroupB,
     indexCount,
     gridSize,
   } = renderResources;
-
-  const multisampleTexture = device.createTexture({
-    format: canvasFormat,
-    usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    size: [context.getCurrentTexture().width, context.getCurrentTexture().height],
-    sampleCount: 4,
-  });
 
   const computeEncoder = device.createCommandEncoder();
 
@@ -35,12 +41,11 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
 
   const computePass = computeEncoder.beginComputePass();
   computePass.setPipeline(computePipeline);
-  computePass.setBindGroup(0, bindGroup);
+  computePass.setBindGroup(0, shouldSwapBindGroups ? bindGroupA : bindGroupB);
   computePass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   computePass.end();
 
   device.queue.submit([computeEncoder.finish()]);
-  device.queue.onSubmittedWorkDone();
 
   const renderEncoder = device.createCommandEncoder();
   const renderPass = renderEncoder.beginRenderPass({
@@ -58,7 +63,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   renderPass.setPipeline(renderPipeline);
   renderPass.setVertexBuffer(0, vertexBuffer);
   renderPass.setIndexBuffer(indexBuffer, 'uint32');
-  renderPass.setBindGroup(0, bindGroup);
+  renderPass.setBindGroup(0, shouldSwapBindGroups ? bindGroupA : bindGroupB);
   renderPass.drawIndexed(indexCount);
   renderPass.end();
 
@@ -70,94 +75,67 @@ export const WebGPUCanvas = () => {
   const webGPUState = useWebGPU(canvasRef as React.RefObject<HTMLCanvasElement>);
   const renderResources = useRenderResources(webGPUState);
   const [pressedKeys, setPressedKeys] = useState(new Set<string>());
+  const pressedKeysRef = useRef(new Set<string>());
   const [isDragging, setIsDragging] = useState(false);
   const [prevMousePos, setPrevMousePos] = useState<{ x: number; y: number } | null>(null);
+  const shouldSwapBindGroups = useRef(true);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      setPressedKeys((prev) => new Set(prev).add(e.key.toLowerCase()));
-    };
+    pressedKeysRef.current = pressedKeys;
+  }, [pressedKeys]);
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      setPressedKeys((prev) => {
-        const next = new Set(prev);
-        next.delete(e.key.toLowerCase());
-        return next;
-      });
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
+  const keyDownHandler = useCallback((e: KeyboardEvent) => {
+    handleKeyDown(e, setPressedKeys);
   }, []);
 
+  const keyUpHandler = useCallback((e: KeyboardEvent) => {
+    handleKeyUp(e, setPressedKeys);
+  }, []);
+
+  //key handlers
   useEffect(() => {
-    if (!renderResources) return;
+    window.addEventListener('keydown', keyDownHandler);
+    window.addEventListener('keyup', keyUpHandler);
 
-    const moveCamera = () => {
-      const didMove = updateCameraPosition(renderResources.camera, pressedKeys);
+    return () => {
+      window.removeEventListener('keydown', keyDownHandler);
+      window.removeEventListener('keyup', keyUpHandler);
+    };
+  }, [keyDownHandler, keyUpHandler]);
 
-      if (didMove && webGPUState?.device) {
+  //camera movement
+  useEffect(() => {
+    if (!renderResources || !webGPUState) return;
+
+    let frameId: number;
+
+    function moveCamera() {
+      if (!renderResources || !webGPUState) return;
+      updateCameraPosition(renderResources.camera, pressedKeysRef.current);
+
+      if (webGPUState.device) {
         const viewMatrix = renderResources.camera.getViewMatrix();
         webGPUState.device.queue.writeBuffer(
           renderResources.uniformBuffer,
           0,
           viewMatrix as Float32Array
         );
-        renderScene(webGPUState, renderResources);
+        renderScene(webGPUState, renderResources, shouldSwapBindGroups.current);
+        shouldSwapBindGroups.current = !shouldSwapBindGroups.current;
       }
-    };
 
-    let animationFrameId: number;
-    function animate() {
-      moveCamera();
-      animationFrameId = requestAnimationFrame(animate);
+      frameId = requestAnimationFrame(moveCamera);
     }
 
-    animationFrameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [renderResources, webGPUState, pressedKeys]);
+    frameId = requestAnimationFrame(moveCamera);
+    return () => cancelAnimationFrame(frameId);
+  }, [renderResources, webGPUState]);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setIsDragging(true);
-    setPrevMousePos({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setPrevMousePos(null);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || !prevMousePos || !canvasRef.current || !renderResources) return;
-
-    const deltaX = e.clientX - prevMousePos.x;
-    const deltaY = e.clientY - prevMousePos.y;
-    setPrevMousePos({ x: e.clientX, y: e.clientY });
-
-    updateCameraRotation(
-      renderResources.camera,
-      deltaX,
-      deltaY,
-      canvasRef.current.width,
-      canvasRef.current.height
-    );
-
-    const device = webGPUState?.device;
-    if (device) {
-      const viewMatrix = renderResources.camera.getViewMatrix();
-      device.queue.writeBuffer(renderResources.uniformBuffer, 0, viewMatrix as Float32Array);
-      renderScene(webGPUState, renderResources);
-    }
-  };
-
+  // initial render
   useEffect(() => {
     if (!canvasRef.current || !webGPUState || !renderResources) return;
-    renderScene(webGPUState, renderResources);
+    renderScene(webGPUState, renderResources, shouldSwapBindGroups.current);
+    shouldSwapBindGroups.current = !shouldSwapBindGroups.current;
   }, [webGPUState, renderResources]);
 
   return (
@@ -165,10 +143,30 @@ export const WebGPUCanvas = () => {
       ref={canvasRef}
       width={1028}
       height={1028}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onMouseMove={handleMouseMove}
+      onMouseDown={(e) => handleMouseDown(e, setIsDragging, setPrevMousePos)}
+      onMouseUp={() => handleMouseUp(setIsDragging, setPrevMousePos)}
+      onMouseLeave={() => handleMouseUp(setIsDragging, setPrevMousePos)}
+      onMouseMove={(e) => {
+        const didRotate = handleMouseMove(
+          e,
+          setPrevMousePos,
+          isDragging,
+          prevMousePos,
+          canvasRef as React.RefObject<HTMLCanvasElement>,
+          renderResources as RenderPipelineResources,
+          updateCameraRotation
+        );
+        if (renderResources && didRotate && webGPUState?.device) {
+          const viewMatrix = renderResources.camera.getViewMatrix();
+          webGPUState.device.queue.writeBuffer(
+            renderResources.uniformBuffer,
+            0,
+            viewMatrix as Float32Array
+          );
+          renderScene(webGPUState, renderResources, shouldSwapBindGroups.current);
+          shouldSwapBindGroups.current = !shouldSwapBindGroups.current;
+        }
+      }}
       style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
       tabIndex={0}
     />

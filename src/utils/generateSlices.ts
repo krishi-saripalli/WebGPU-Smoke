@@ -37,8 +37,9 @@ export function generateSlices(gridSize: number) {
     );
   }
 
-  for (let z of positions) {
-    addQuad([-1.0, -1.0, z], [1.0, -1.0, z], [-1.0, 1.0, z], [1.0, 1.0, z]);
+  for (let idx = 0; idx <= gridSize + 1; idx++) {
+    const z = -1.0 + idx * (2.0 / gridSize);
+    addQuad([-1, -1, z], [1, -1, z], [-1, 1, z], [1, 1, z]);
   }
   //TODO: Add the other axis-aligned slices
 

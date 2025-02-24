@@ -63,8 +63,16 @@ fn computeMain(@builtin(global_invocation_id) id: vec3<u32>) {
       return;
   }
 
-  // In this test, we write 1.0 everywhere (a dense value)
-  textureStore(dstDensity, id, vec4f(1.0));
+  let gridCenter = vec3<u32>(uniforms.gridSize / 2u);
+
+    //let input = textureLoad(srcDensity, id, 0);
+    if (id.x == gridCenter.x && 
+        id.y == gridCenter.y && 
+        id.z == gridCenter.z) {
+        textureStore(dstDensity, id, vec4f(1.0));
+    } else {
+        textureStore(dstDensity, id, vec4f(0.0));
+    }
 }
 
 

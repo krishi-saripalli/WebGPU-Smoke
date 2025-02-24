@@ -315,7 +315,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
                 format: canvasFormat,
                 blend: {
                   color: {
-                    srcFactor: 'one',
+                    srcFactor: 'src-alpha',
                     dstFactor: 'one-minus-src-alpha',
                   },
                   alpha: {

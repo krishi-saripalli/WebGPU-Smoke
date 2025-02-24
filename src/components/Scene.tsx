@@ -74,7 +74,7 @@ const renderScene = (
 
   renderPass.setPipeline(renderPipeline);
   renderPass.setBindGroup(0, uniformBindGroup);
-  renderPass.setBindGroup(1, shouldSwapBindGroups ? renderBindGroupA : renderBindGroupB);
+  renderPass.setBindGroup(1, shouldSwapBindGroups ? renderBindGroupB : renderBindGroupA);
 
   // Draw wireframe
   renderPass.setVertexBuffer(0, wireframeVertexBuffer);

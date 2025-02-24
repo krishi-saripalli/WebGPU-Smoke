@@ -4,17 +4,24 @@ import { Camera } from '@/modules/Camera';
 import { Vec3 } from 'gl-matrix';
 import { loadShader } from '@/utils/shaderLoader';
 import { generateWireframe } from '@/utils/generateWireframe';
+import { generateSlices } from '@/utils/generateSlices';
 
 export interface RenderPipelineResources {
   renderPipeline: GPURenderPipeline;
   computePipeline: GPUComputePipeline;
-  vertexBuffer: GPUBuffer;
-  indexBuffer: GPUBuffer;
+  wireframeVertexBuffer: GPUBuffer;
+  wireframeIndexBuffer: GPUBuffer;
+  slicesVertexBuffer: GPUBuffer;
+  slicesIndexBuffer: GPUBuffer;
   uniformBuffer: GPUBuffer;
   multisampleTexture: GPUTexture;
-  bindGroupA: GPUBindGroup;
-  bindGroupB: GPUBindGroup;
-  indexCount: number;
+  computeBindGroupA: GPUBindGroup;
+  computeBindGroupB: GPUBindGroup;
+  renderBindGroupA: GPUBindGroup;
+  renderBindGroupB: GPUBindGroup;
+  uniformBindGroup: GPUBindGroup;
+  wireframeIndexCount: number;
+  slicesIndexCount: number;
   camera: Camera;
   gridSize: number;
 }
@@ -40,10 +47,11 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         /////////////////////////////////////////////////////////////////////////
         // Uniform buffer
         /////////////////////////////////////////////////////////////////////////
-        // Size is 2 4x4 matrices (view and projection) * 16 floats per matrix * 4 bytes per float
-        // + 2 u32s * 4 bytes per u32 + 8 bytes for padding to make it 16 byte aligned
+        // Size is 2 matrices (view and projection) * 16 floats per matrix * 4 bytes per float
+        // + 2 Vec3s * 4 bytes per float
         // prettier-ignore
-        const uniformBufferSize = (2 * 16 * 4) + (2 * 4) + 8;
+        const PADDING = 8;
+        const uniformBufferSize = 2 * 16 * 4 + 2 * 3 * 4 + PADDING;
         const uniformBuffer = device.createBuffer({
           size: uniformBufferSize,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -61,10 +69,18 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         const viewMatrix = camera.getViewMatrix();
         const projectionMatrix = camera.getProjectionMatrix();
-
-        device.queue.writeBuffer(uniformBuffer, 0, viewMatrix as Float32Array);
-        device.queue.writeBuffer(uniformBuffer, 16 * 4, projectionMatrix as Float32Array); // offset for projection matrix (after view matrix)
-        device.queue.writeBuffer(uniformBuffer, 2 * 16 * 4, new Uint32Array([gridSize, gridSize]));
+        let offset = 0;
+        device.queue.writeBuffer(uniformBuffer, offset, viewMatrix as Float32Array);
+        offset += 16 * 4;
+        device.queue.writeBuffer(uniformBuffer, offset, projectionMatrix as Float32Array);
+        offset += 16 * 4;
+        device.queue.writeBuffer(
+          uniformBuffer,
+          offset,
+          new Uint32Array([gridSize, gridSize, gridSize])
+        );
+        offset += 3 * 4;
+        device.queue.writeBuffer(uniformBuffer, offset, new Float32Array([...camera.getForward()]));
 
         /////////////////////////////////////////////////////////////////////////
         // Density texture A
@@ -89,23 +105,30 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
             GPUTextureUsage.COPY_DST,
         });
 
-        const bindGroupLayout = device.createBindGroupLayout({
+        /////////////////////////////////////////////////////////////////////////
+        // Bind group layouts
+        /////////////////////////////////////////////////////////////////////////
+        // 1. Uniform-only layout
+        const uniformBindGroupLayout = device.createBindGroupLayout({
           entries: [
             {
               binding: 0,
               visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
               buffer: { type: 'uniform' },
             },
+          ],
+        });
+
+        // 2. Compute layout (reads one 3D texture and writes another)
+        const computeTexturesBindGroupLayout = device.createBindGroupLayout({
+          entries: [
             {
-              binding: 1,
+              binding: 0,
               visibility: GPUShaderStage.COMPUTE,
-              texture: {
-                sampleType: 'float',
-                viewDimension: '3d',
-              },
+              texture: { sampleType: 'float', viewDimension: '3d' },
             },
             {
-              binding: 2,
+              binding: 1,
               visibility: GPUShaderStage.COMPUTE,
               storageTexture: {
                 access: 'write-only',
@@ -113,8 +136,14 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
                 viewDimension: '3d',
               },
             },
+          ],
+        });
+
+        // 3. Render layout (samples from a 3D texture)
+        const renderTexturesBindGroupLayout = device.createBindGroupLayout({
+          entries: [
             {
-              binding: 3,
+              binding: 0,
               visibility: GPUShaderStage.FRAGMENT,
               texture: {
                 sampleType: 'float',
@@ -122,90 +151,126 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
               },
             },
             {
-              binding: 4,
+              binding: 1,
               visibility: GPUShaderStage.FRAGMENT,
               sampler: { type: 'filtering' },
             },
           ],
         });
 
+        /////////////////////////////////////////////////////////////////////////
+        // Sampler
+        /////////////////////////////////////////////////////////////////////////
         const sampler = device.createSampler({
           magFilter: 'linear',
           minFilter: 'linear',
           mipmapFilter: 'linear',
         });
 
-        const bindGroupA = device.createBindGroup({
-          layout: bindGroupLayout,
+        /////////////////////////////////////////////////////////////////////////
+        // Bind groups
+        /////////////////////////////////////////////////////////////////////////
+        const uniformBindGroup = device.createBindGroup({
+          layout: uniformBindGroupLayout,
           entries: [
             {
               binding: 0,
               resource: { buffer: uniformBuffer },
             },
-            {
-              binding: 1,
-              resource: densityTextureA.createView(),
-            },
-            {
-              binding: 2,
-              resource: densityTextureB.createView(),
-            },
-            {
-              binding: 3,
-              resource: densityTextureA.createView(),
-            },
-            {
-              binding: 4,
-              resource: sampler,
-            },
           ],
         });
 
-        const bindGroupB = device.createBindGroup({
-          layout: bindGroupLayout,
+        // For compute pass: one bind group for "A→B", another for "B→A"
+        const computeBindGroupA = device.createBindGroup({
+          layout: computeTexturesBindGroupLayout,
           entries: [
             {
               binding: 0,
-              resource: { buffer: uniformBuffer },
+              resource: densityTextureA.createView(), // read from A
             },
             {
               binding: 1,
-              resource: densityTextureB.createView(),
+              resource: densityTextureB.createView(), // write to B
+            },
+          ],
+        });
+        const computeBindGroupB = device.createBindGroup({
+          layout: computeTexturesBindGroupLayout,
+          entries: [
+            {
+              binding: 0,
+              resource: densityTextureB.createView(), // read from B
             },
             {
-              binding: 2,
-              resource: densityTextureA.createView(),
+              binding: 1,
+              resource: densityTextureA.createView(), // write to A
+            },
+          ],
+        });
+
+        // For render pass: one bind group that samples from A, another from B
+        const renderBindGroupA = device.createBindGroup({
+          layout: renderTexturesBindGroupLayout,
+          entries: [
+            {
+              binding: 0,
+              resource: densityTextureA.createView(), // sample from A
             },
             {
-              binding: 3,
-              resource: densityTextureB.createView(),
+              binding: 1,
+              resource: sampler,
+            },
+          ],
+        });
+        const renderBindGroupB = device.createBindGroup({
+          layout: renderTexturesBindGroupLayout,
+          entries: [
+            {
+              binding: 0,
+              resource: densityTextureB.createView(), // sample from B
             },
             {
-              binding: 4,
+              binding: 1,
               resource: sampler,
             },
           ],
         });
 
-        const { vertexPositions, indicesList } = generateWireframe(gridSize);
+        const { vertexPositions: wireframeVertexPositions, indicesList: wireframeIndicesList } =
+          generateWireframe(gridSize);
 
-        const vertices = new Float32Array(vertexPositions);
-        const indices = new Uint32Array(indicesList);
+        const wireframeVertices = new Float32Array(wireframeVertexPositions);
+        const wireframeIndices = new Uint32Array(wireframeIndicesList);
 
-        console.log('Vertices count:', vertices.length / 3);
-        console.log('Quads count:', indices.length / 6);
-
-        const vertexBuffer = device.createBuffer({
-          size: vertices.byteLength,
+        const wireframeVertexBuffer = device.createBuffer({
+          size: wireframeVertices.byteLength,
           usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
-        device.queue.writeBuffer(vertexBuffer, 0, vertices);
+        device.queue.writeBuffer(wireframeVertexBuffer, 0, wireframeVertices);
 
-        const indexBuffer = device.createBuffer({
-          size: indices.byteLength,
+        const wireframeIndexBuffer = device.createBuffer({
+          size: wireframeIndices.byteLength,
           usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
-        device.queue.writeBuffer(indexBuffer, 0, indices);
+        device.queue.writeBuffer(wireframeIndexBuffer, 0, wireframeIndices);
+
+        const { vertexPositions: slicesVertexPositions, indicesList: slicesIndicesList } =
+          generateSlices(gridSize);
+
+        const slicesVertices = new Float32Array(slicesVertexPositions);
+        const slicesIndices = new Uint32Array(slicesIndicesList);
+
+        const slicesVertexBuffer = device.createBuffer({
+          size: slicesVertices.byteLength,
+          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(slicesVertexBuffer, 0, slicesVertices);
+
+        const slicesIndexBuffer = device.createBuffer({
+          size: slicesIndices.byteLength,
+          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(slicesIndexBuffer, 0, slicesIndices);
 
         // create shader module and pipeline
         let shaderModule: GPUShaderModule;
@@ -223,7 +288,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const renderPipeline = device.createRenderPipeline({
           label: 'Wireframe',
           layout: device.createPipelineLayout({
-            bindGroupLayouts: [bindGroupLayout],
+            bindGroupLayouts: [uniformBindGroupLayout, renderTexturesBindGroupLayout],
           }),
           vertex: {
             module: shaderModule,
@@ -245,7 +310,21 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           fragment: {
             module: shaderModule,
             entryPoint: 'fragmentMain',
-            targets: [{ format: canvasFormat }],
+            targets: [
+              {
+                format: canvasFormat,
+                blend: {
+                  color: {
+                    srcFactor: 'one',
+                    dstFactor: 'one-minus-src-alpha',
+                  },
+                  alpha: {
+                    srcFactor: 'one',
+                    dstFactor: 'one-minus-src-alpha',
+                  },
+                },
+              },
+            ],
           },
           multisample: {
             count: 4,
@@ -261,7 +340,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const computePipeline = device.createComputePipeline({
           label: 'Smoke Simulation',
           layout: device.createPipelineLayout({
-            bindGroupLayouts: [bindGroupLayout],
+            bindGroupLayouts: [uniformBindGroupLayout, computeTexturesBindGroupLayout],
           }),
           compute: {
             module: shaderModule,
@@ -285,13 +364,19 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         setResources({
           renderPipeline,
           computePipeline,
-          vertexBuffer,
-          indexBuffer,
+          wireframeVertexBuffer,
+          wireframeIndexBuffer,
+          slicesVertexBuffer,
+          slicesIndexBuffer,
           uniformBuffer,
           multisampleTexture,
-          bindGroupA,
-          bindGroupB,
-          indexCount: indices.length,
+          computeBindGroupA,
+          computeBindGroupB,
+          renderBindGroupA,
+          renderBindGroupB,
+          uniformBindGroup,
+          wireframeIndexCount: wireframeIndices.length,
+          slicesIndexCount: slicesIndices.length,
           camera,
           gridSize,
         });

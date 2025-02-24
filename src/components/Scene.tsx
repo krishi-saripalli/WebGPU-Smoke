@@ -20,16 +20,20 @@ const renderScene = (
   const {
     renderPipeline,
     computePipeline,
-    vertexBuffer,
-    indexBuffer,
+    wireframeVertexBuffer,
+    wireframeIndexBuffer,
+    slicesVertexBuffer,
+    slicesIndexBuffer,
     multisampleTexture,
-    bindGroupA,
-    bindGroupB,
-    indexCount,
+    uniformBindGroup,
+    computeBindGroupA,
+    computeBindGroupB,
+    renderBindGroupA,
+    renderBindGroupB,
+    wireframeIndexCount,
+    slicesIndexCount,
     gridSize,
   } = renderResources;
-
-  const computeEncoder = device.createCommandEncoder();
 
   // Compute pass
   const workgroupSize = [4, 4, 4];
@@ -39,14 +43,22 @@ const renderScene = (
     Math.ceil(gridSize / workgroupSize[2]),
   ];
 
+  /////////////////////////////////////////////////////////////////////////
+  // Compute pass
+  /////////////////////////////////////////////////////////////////////////
+  const computeEncoder = device.createCommandEncoder();
   const computePass = computeEncoder.beginComputePass();
   computePass.setPipeline(computePipeline);
-  computePass.setBindGroup(0, shouldSwapBindGroups ? bindGroupA : bindGroupB);
+  computePass.setBindGroup(0, uniformBindGroup);
+  computePass.setBindGroup(1, shouldSwapBindGroups ? computeBindGroupA : computeBindGroupB);
   computePass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   computePass.end();
 
   device.queue.submit([computeEncoder.finish()]);
 
+  /////////////////////////////////////////////////////////////////////////
+  // Render pass
+  /////////////////////////////////////////////////////////////////////////
   const renderEncoder = device.createCommandEncoder();
   const renderPass = renderEncoder.beginRenderPass({
     colorAttachments: [
@@ -61,10 +73,19 @@ const renderScene = (
   });
 
   renderPass.setPipeline(renderPipeline);
-  renderPass.setVertexBuffer(0, vertexBuffer);
-  renderPass.setIndexBuffer(indexBuffer, 'uint32');
-  renderPass.setBindGroup(0, shouldSwapBindGroups ? bindGroupA : bindGroupB);
-  renderPass.drawIndexed(indexCount);
+  renderPass.setBindGroup(0, uniformBindGroup);
+  renderPass.setBindGroup(1, shouldSwapBindGroups ? renderBindGroupA : renderBindGroupB);
+
+  // Draw wireframe
+  renderPass.setVertexBuffer(0, wireframeVertexBuffer);
+  renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
+  renderPass.drawIndexed(wireframeIndexCount);
+
+  // Draw slices
+  renderPass.setVertexBuffer(0, slicesVertexBuffer);
+  renderPass.setIndexBuffer(slicesIndexBuffer, 'uint32');
+  renderPass.drawIndexed(slicesIndexCount);
+
   renderPass.end();
 
   device.queue.submit([renderEncoder.finish()]);
@@ -115,11 +136,20 @@ export const WebGPUCanvas = () => {
 
       if (webGPUState.device) {
         const viewMatrix = renderResources.camera.getViewMatrix();
+        const forward = renderResources.camera.getForward();
+
         webGPUState.device.queue.writeBuffer(
           renderResources.uniformBuffer,
           0,
           viewMatrix as Float32Array
         );
+
+        webGPUState.device.queue.writeBuffer(
+          renderResources.uniformBuffer,
+          2 * 16 * 4 + 3 * 4,
+          new Float32Array([...forward])
+        );
+
         renderScene(webGPUState, renderResources, shouldSwapBindGroups.current);
         shouldSwapBindGroups.current = !shouldSwapBindGroups.current;
       }
@@ -158,11 +188,20 @@ export const WebGPUCanvas = () => {
         );
         if (renderResources && didRotate && webGPUState?.device) {
           const viewMatrix = renderResources.camera.getViewMatrix();
+          const forward = renderResources.camera.getForward();
+
           webGPUState.device.queue.writeBuffer(
             renderResources.uniformBuffer,
             0,
             viewMatrix as Float32Array
           );
+
+          webGPUState.device.queue.writeBuffer(
+            renderResources.uniformBuffer,
+            2 * 16 * 4 + 8,
+            new Float32Array([...forward, 0]) // Add 0 for padding
+          );
+
           renderScene(webGPUState, renderResources, shouldSwapBindGroups.current);
           shouldSwapBindGroups.current = !shouldSwapBindGroups.current;
         }

@@ -6,7 +6,8 @@ export function generateWireframe(gridSize: number) {
   /////////////////////////////////////////////////////////////////////////
   const positions: number[] = [];
   for (let idx = 0; idx < gridSize; idx++) {
-    positions.push(-1.0 + (2.0 * idx) / (gridSize - 1));
+    positions.push(-1.0);
+    positions.push(1.0);
   }
 
   const vertexPositions: number[] = [];

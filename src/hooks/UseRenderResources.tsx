@@ -7,7 +7,8 @@ import { generateWireframe } from '@/utils/generateWireframe';
 import { generateSlices } from '@/utils/generateSlices';
 
 export interface RenderPipelineResources {
-  renderPipeline: GPURenderPipeline;
+  wireframePipeline: GPURenderPipeline;
+  slicesPipeline: GPURenderPipeline;
   computePipeline: GPUComputePipeline;
   wireframeVertexBuffer: GPUBuffer;
   wireframeIndexBuffer: GPUBuffer;
@@ -58,7 +59,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         });
 
         const camera = new Camera({
-          position: new Vec3([0, 1, 4]),
+          position: new Vec3([0, 0, 4]),
           forward: new Vec3([0, 0, -1]),
           up: new Vec3([0, 1, 0]),
           heightAngle: Math.PI / 2,
@@ -285,7 +286,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         /////////////////////////////////////////////////////////////////////////
         // Render pipeline
         /////////////////////////////////////////////////////////////////////////
-        const renderPipeline = device.createRenderPipeline({
+        const pipelineDescriptor: GPURenderPipelineDescriptor = {
           label: 'Wireframe',
           layout: device.createPipelineLayout({
             bindGroupLayouts: [uniformBindGroupLayout, renderTexturesBindGroupLayout],
@@ -295,7 +296,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
             entryPoint: 'vertexMain',
             buffers: [
               {
-                arrayStride: 12,
+                arrayStride: 12, // only storing position, so 3 floats * 4 bytes
                 stepMode: 'vertex',
                 attributes: [
                   {
@@ -307,6 +308,26 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
               },
             ],
           },
+          fragment: {
+            module: shaderModule,
+            entryPoint: 'fragmentMain',
+            targets: [
+              {
+                format: canvasFormat,
+              },
+            ],
+          },
+          multisample: {
+            count: 4,
+          },
+          primitive: {
+            topology: 'triangle-list',
+          },
+        };
+
+        const slicesPipeline = device.createRenderPipeline({
+          ...pipelineDescriptor,
+          label: 'Slices Rendering',
           fragment: {
             module: shaderModule,
             entryPoint: 'fragmentMain',
@@ -326,12 +347,11 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
               },
             ],
           },
-          multisample: {
-            count: 4,
-          },
-          primitive: {
-            topology: 'triangle-list',
-          },
+        });
+
+        const wireframePipeline = device.createRenderPipeline({
+          ...pipelineDescriptor,
+          label: 'Wireframe Rendering',
         });
 
         /////////////////////////////////////////////////////////////////////////
@@ -362,7 +382,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         });
 
         setResources({
-          renderPipeline,
+          wireframePipeline,
+          slicesPipeline,
           computePipeline,
           wireframeVertexBuffer,
           wireframeIndexBuffer,

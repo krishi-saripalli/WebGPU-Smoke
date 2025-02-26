@@ -18,7 +18,8 @@ const renderScene = (
 ) => {
   const { device, context, canvasFormat } = webGPUState;
   const {
-    renderPipeline,
+    wireframePipeline,
+    slicesPipeline,
     computePipeline,
     wireframeVertexBuffer,
     wireframeIndexBuffer,
@@ -72,7 +73,7 @@ const renderScene = (
     ],
   });
 
-  renderPass.setPipeline(renderPipeline);
+  renderPass.setPipeline(wireframePipeline);
   renderPass.setBindGroup(0, uniformBindGroup);
   renderPass.setBindGroup(1, shouldSwapBindGroups ? renderBindGroupB : renderBindGroupA);
 
@@ -82,6 +83,7 @@ const renderScene = (
   renderPass.drawIndexed(wireframeIndexCount);
 
   // Draw slices
+  renderPass.setPipeline(slicesPipeline); // TODO: optimize this out using render bundles?
   renderPass.setVertexBuffer(0, slicesVertexBuffer);
   renderPass.setIndexBuffer(slicesIndexBuffer, 'uint32');
   renderPass.drawIndexed(slicesIndexCount);
@@ -170,6 +172,7 @@ export const WebGPUCanvas = () => {
 
   return (
     <canvas
+      className="bg"
       ref={canvasRef}
       width={1028}
       height={1028}

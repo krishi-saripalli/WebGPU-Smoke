@@ -43,7 +43,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           throw new Error('Invalid shader code: shader code is empty');
         }
 
-        const gridSize = 8;
+        const gridSize = 7;
 
         /////////////////////////////////////////////////////////////////////////
         // Uniform buffer
@@ -330,13 +330,13 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           label: 'Slices Rendering',
           fragment: {
             module: shaderModule,
-            entryPoint: 'fragmentMain',
+            entryPoint: 'fragmentSlices',
             targets: [
               {
                 format: canvasFormat,
                 blend: {
                   color: {
-                    srcFactor: 'src-alpha',
+                    srcFactor: 'one',
                     dstFactor: 'one-minus-src-alpha',
                   },
                   alpha: {

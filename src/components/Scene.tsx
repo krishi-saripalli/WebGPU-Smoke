@@ -148,7 +148,7 @@ export const WebGPUCanvas = () => {
 
         webGPUState.device.queue.writeBuffer(
           renderResources.uniformBuffer,
-          2 * 16 * 4 + 3 * 4,
+          2 * 16 * 4 + 3 * 4 + 4,
           new Float32Array([...forward])
         );
 
@@ -201,8 +201,8 @@ export const WebGPUCanvas = () => {
 
           webGPUState.device.queue.writeBuffer(
             renderResources.uniformBuffer,
-            2 * 16 * 4 + 8,
-            new Float32Array([...forward, 0]) // Add 0 for padding
+            2 * 16 * 4 + 3 * 4 + 4,
+            new Float32Array([...forward])
           );
 
           renderScene(webGPUState, renderResources, shouldSwapBindGroups.current);

@@ -43,7 +43,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           throw new Error('Invalid shader code: shader code is empty');
         }
 
-        const gridSize = 7;
+        const gridSize = 100;
 
         /////////////////////////////////////////////////////////////////////////
         // Uniform buffer

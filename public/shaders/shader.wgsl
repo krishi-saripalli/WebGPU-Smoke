@@ -114,11 +114,14 @@ fn computeMain(@builtin(global_invocation_id) id: vec3<u32>) {
 @group(1) @binding(9) var dstTemperature: texture_storage_3d<r32float, write>;
 
 // Temporary fields for calculations
-@group(1) @binding(10) var pressure: texture_storage_3d<r32float, write>;
-@group(1) @binding(11) var divergence: texture_storage_3d<r32float, write>;
-@group(1) @binding(12) var vorticity: texture_storage_3d<rgba16float, write>; // 3D vector
-@group(1) @binding(13) var vorticityForce: texture_storage_3d<rgba16float, write>; // 3D vector
-@group(1) @binding(14) var texSampler: sampler;
+@group(1) @binding(10) var srcPressure: texture_3d<f32>;
+@group(1) @binding(11) var dstPressure: texture_storage_3d<r32float, write>;
+@group(1) @binding(12) var divergence: texture_storage_3d<r32float, write>;
+@group(1) @binding(13) var srcVorticity: texture_3d<f32>; // 3D vector
+@group(1) @binding(14) var dstVorticity: texture_storage_3d<rgba16float, write>; // 3D vector
+@group(1) @binding(15) var srcVorticityForce: texture_3d<f32>; // 3D vector
+@group(1) @binding(16) var dstVorticityForce: texture_storage_3d<rgba16float, write>; // 3D vector
+@group(1) @binding(17) var texSampler: sampler;
 
 
 
@@ -131,7 +134,6 @@ struct SimulationParams {
     buoyancyBeta: f32,    // beta in buoyancy equation
     ambientTemperature: f32, // T_amb in buoyancy equation
     iterations: u32,      // pressure solver iterations
-    dissipation: f32      // optional dissipation factor
 }
 @group(0) @binding(1) var<uniform> params: SimulationParams;
 
@@ -144,23 +146,20 @@ fn applyExternalForces(@builtin(global_invocation_id) id: vec3<u32>) {
     return;
   }
 
-
   let velocity_x = textureLoad(srcVelocityX, id, 0).x;
   let velocity_y = textureLoad(srcVelocityY, id, 0).x;
   let velocity_z = textureLoad(srcVelocityZ, id, 0).x;
 
-
-  let temp = textureLoad(srcTemperature, id, 0);
-  let density = textureLoad(srcDensity, id, 0);
+  let temp = textureLoad(srcTemperature, id, 0).x;
+  let density = textureLoad(srcDensity, id, 0).x;
 
   //(Eq. 8)
   let up = vec3<f32>(0.0,1.0,0.0);
   let buoyancy = -1.0 * params.buoyancyAlpha * density * up + params.buoyancyBeta * (temp - params.ambientTemperature) * up;
 
-  textureStore(dstVelocityX, id, vec4f(velocity_x + buoyancy.x,0,0,0));
-  textureStore(dstVelocityY, id, vec4f(velocity_y + buoyancy.y,0,0,0));
-  textureStore(dstVelocityZ, id, vec4f(velocity_z + buoyancy.z,0,0,0));
-
+  textureStore(dstVelocityX, id, vec4f(velocity_x + buoyancy.x, 0.0, 0.0, 0.0));
+  textureStore(dstVelocityY, id, vec4f(velocity_y + buoyancy.y, 0.0, 0.0, 0.0));
+  textureStore(dstVelocityZ, id, vec4f(velocity_z + buoyancy.z, 0.0, 0.0, 0.0));
 }
 
 @compute @workgroup_size(4,4,4)
@@ -172,10 +171,6 @@ fn computeVorticity(@builtin(global_invocation_id) id : vec3<u32>) {
   }
 
 
-  let velocity_x = textureLoad(srcVelocityX, id, 0).x;
-  let velocity_y = textureLoad(srcVelocityY, id, 0).x;
-  let velocity_z = textureLoad(srcVelocityZ, id, 0).x;
-
   // vorticity = curl(velocity) (Eq. 9)
   let dvz_dy = (textureLoad(srcVelocityZ, id + vec3<i32>(0,1,0), 0).x) - (textureLoad(srcVelocityZ, id - vec3<i32>(0,1,0), 0).x);
   let dvy_dz = (textureLoad(srcVelocityY, id + vec3<i32>(0,0,1), 0).x) - (textureLoad(srcVelocityY, id - vec3<i32>(0,0,1), 0).x);
@@ -186,8 +181,7 @@ fn computeVorticity(@builtin(global_invocation_id) id : vec3<u32>) {
 
   let vort = vec3<f32>(dvz_dy - dvy_dz, dvx_dz - dvz_dx, dvy_dx - dvx_dy) / (2.0 * params.dx);
 
-  textureStore(vorticity, id, vec4f(vort, 0.0));
-
+  textureStore(dstVorticity, id, vec4f(vort, 0.0));
 }
 
 @compute @workgroup_size(4,4,4)
@@ -198,12 +192,11 @@ fn computeVorticityConfinement(@builtin(global_invocation_id) id : vec3<u32>) {
     return;
   }
 
-
   // gradient of the *magnitude* of vorticity (Eq. 10)
-  let dvort_mag_dx = length(textureLoad(vorticity, id + vec3<i32>(1,0,0), 0).xyz) - length(textureLoad(vorticity, id - vec3<i32>(1,0,0), 0).xyz);
-  let dvort_mag_dy = length(textureLoad(vorticity, id + vec3<i32>(0,1,0), 0).xyz) - length(textureLoad(vorticity, id - vec3<i32>(0,1,0), 0).xyz);
-  let dvort_mag_dz = length(textureLoad(vorticity, id + vec3<i32>(0,0,1), 0).xyz) - length(textureLoad(vorticity, id - vec3<i32>(0,0,1), 0).xyz);
-  var grad = vec3<f32>(dvort_mag_dx, dvort_mag_dy, dvort_mag_dz)  / (2.0 * params.dx);
+  let dvort_mag_dx = length(textureLoad(srcVorticity, id + vec3<i32>(1,0,0), 0).xyz) - length(textureLoad(srcVorticity, id - vec3<i32>(1,0,0), 0).xyz);
+  let dvort_mag_dy = length(textureLoad(srcVorticity, id + vec3<i32>(0,1,0), 0).xyz) - length(textureLoad(srcVorticity, id - vec3<i32>(0,1,0), 0).xyz);
+  let dvort_mag_dz = length(textureLoad(srcVorticity, id + vec3<i32>(0,0,1), 0).xyz) - length(textureLoad(srcVorticity, id - vec3<i32>(0,0,1), 0).xyz);
+  var grad = vec3<f32>(dvort_mag_dx, dvort_mag_dy, dvort_mag_dz) / (2.0 * params.dx);
 
   let gradLength = length(grad);
   
@@ -213,15 +206,13 @@ fn computeVorticityConfinement(@builtin(global_invocation_id) id : vec3<u32>) {
     grad = vec3<f32>(0.0);
   }
 
-  let vort = textureLoad(vorticity, id, 0).xyz;
+  let vort = textureLoad(srcVorticity, id, 0).xyz;
   let confinement = params.vorticityStrength * params.dx * cross(grad, vort);
 
-
-  textureStore(vorticityForce, id, vec4f(confinement, 0.0));
-  
+  textureStore(dstVorticityForce, id, vec4f(confinement, 0.0));
 }
 
-
+@compute @workgroup_size(4,4,4)
 fn advect(@builtin(global_invocation_id) id : vec3<u32>) {
   if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
       id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
@@ -229,8 +220,14 @@ fn advect(@builtin(global_invocation_id) id : vec3<u32>) {
     return;
   }
 
-  vec3 coord = vec3<f32>(id) - params.dt * textureLoad(srcVelocityX, id, 0).xyz; // TODO: do I need texel size here?
+  // Properly construct velocity vector from individual components
+  let velocity = vec3<f32>(
+    textureLoad(srcVelocityX, id, 0).x,
+    textureLoad(srcVelocityY, id, 0).x,
+    textureLoad(srcVelocityZ, id, 0).x
+  );
 
+  let coord = vec3<f32>(id) - params.dt * velocity * params.dx;
 
   // (Eq. 2)
   textureStore(dstVelocityX, id, textureSample(srcVelocityX, texSampler, coord)); 
@@ -243,8 +240,10 @@ fn advect(@builtin(global_invocation_id) id : vec3<u32>) {
   // (Eq. 7)
   textureStore(dstDensity, id, textureSample(srcDensity, texSampler, coord)); 
 
+  return;
 }
 
+@compute @workgroup_size(4,4,4)
 fn computePressure(@builtin(global_invocation_id) id : vec3<u32>) {
   if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
       id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
@@ -252,9 +251,113 @@ fn computePressure(@builtin(global_invocation_id) id : vec3<u32>) {
     return;
   }
 
+  // Use Laplacian and then isolate pressure (https://scicomp.stackexchange.com/questions/35920/3d-laplacian-operator)
+  // p(i,j,k) = (p(i+1,j,k) + p(i-1,j,k) + p(i,j+1,k) + p(i,j-1,k) + p(i,j,k+1) + p(i,j,k-1) - h²·div(i,j,k))/6
+  let h_squared = params.dx * params.dx;
   
+  let p = (
+    textureLoad(srcPressure, id + vec3<i32>(1,0,0), 0).x +
+    textureLoad(srcPressure, id - vec3<i32>(1,0,0), 0).x +
+    textureLoad(srcPressure, id + vec3<i32>(0,1,0), 0).x +
+    textureLoad(srcPressure, id - vec3<i32>(0,1,0), 0).x +
+    textureLoad(srcPressure, id + vec3<i32>(0,0,1), 0).x +
+    textureLoad(srcPressure, id - vec3<i32>(0,0,1), 0).x -
+    h_squared * textureLoad(divergence, id, 0).x
+  ) / 6.0;
+  
+  textureStore(dstPressure, id, vec4f(p, 0.0, 0.0, 0.0));
+  return;
+}
+
+@compute @workgroup_size(4,4,4)
+fn computeDivergence(@builtin(global_invocation_id) id : vec3<u32>) {
+  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
+      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
+      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+    return;
+  }
+
+  let dv_dx = textureLoad(srcVelocityX, id + vec3<i32>(1,0,0), 0).x - textureLoad(srcVelocityX, id - vec3<i32>(1,0,0), 0).x;
+  let dv_dy = textureLoad(srcVelocityY, id + vec3<i32>(0,1,0), 0).x - textureLoad(srcVelocityY, id - vec3<i32>(0,1,0), 0).x;
+  let dv_dz = textureLoad(srcVelocityZ, id + vec3<i32>(0,0,1), 0).x - textureLoad(srcVelocityZ, id - vec3<i32>(0,0,1), 0).x;
+
+  let div = (dv_dx + dv_dy + dv_dz) / (2.0 * params.dx);
+
+  textureStore(divergence, id, vec4f(div, 0.0, 0.0, 0.0));
+  return;
+}
+
+@compute @workgroup_size(4,4,4)
+fn applyPressureGradient(@builtin(global_invocation_id) id: vec3<u32>) {
+  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
+      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
+      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+    return;
+  }
+  
+  let dp_dx = (textureLoad(srcPressure, id + vec3<i32>(1,0,0), 0).x - 
+               textureLoad(srcPressure, id - vec3<i32>(1,0,0), 0).x) / (2.0 * params.dx);
+               
+  let dp_dy = (textureLoad(srcPressure, id + vec3<i32>(0,1,0), 0).x - 
+               textureLoad(srcPressure, id - vec3<i32>(0,1,0), 0).x) / (2.0 * params.dx);
+               
+  let dp_dz = (textureLoad(srcPressure, id + vec3<i32>(0,0,1), 0).x - 
+               textureLoad(srcPressure, id - vec3<i32>(0,0,1), 0).x) / (2.0 * params.dx);
+  
+  // Subtract pressure gradient to make velocity divergence-free (equation 5)
+  let vx = textureLoad(srcVelocityX, id, 0).x - dp_dx;
+  let vy = textureLoad(srcVelocityY, id, 0).x - dp_dy;
+  let vz = textureLoad(srcVelocityZ, id, 0).x - dp_dz;
+  
+  textureStore(dstVelocityX, id, vec4f(vx, 0.0, 0.0, 0.0));
+  textureStore(dstVelocityY, id, vec4f(vy, 0.0, 0.0, 0.0));
+  textureStore(dstVelocityZ, id, vec4f(vz, 0.0, 0.0, 0.0));
+}
 
 
+@compute @workgroup_size(4,4,4)
+fn applyVorticityForce(@builtin(global_invocation_id) id: vec3<u32>) {
+  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
+      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
+      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+    return;
+  }
+  
+  let velocity_x = textureLoad(srcVelocityX, id, 0).x;
+  let velocity_y = textureLoad(srcVelocityY, id, 0).x;
+  let velocity_z = textureLoad(srcVelocityZ, id, 0).x;
+  
+  let force = textureLoad(srcVorticityForce, id, 0).xyz;
+  
+  textureStore(dstVelocityX, id, vec4f(velocity_x + force.x * params.dt, 0.0, 0.0, 0.0));
+  textureStore(dstVelocityY, id, vec4f(velocity_y + force.y * params.dt, 0.0, 0.0, 0.0));
+  textureStore(dstVelocityZ, id, vec4f(velocity_z + force.z * params.dt, 0.0, 0.0, 0.0));
+}
+
+
+@compute @workgroup_size(4,4,4)
+fn solvePressureJacobi(@builtin(global_invocation_id) id: vec3<u32>) {
+  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
+      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
+      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+    return;
+  }
+
+  // Use Laplacian and then isolate pressure; Laplacian can be found here (https://scicomp.stackexchange.com/questions/35920/3d-laplacian-operator)
+  // p(i,j,k) = (p(i+1,j,k) + p(i-1,j,k) + p(i,j+1,k) + p(i,j-1,k) + p(i,j,k+1) + p(i,j,k-1) - h²·div(i,j,k))/6
+  let h_squared = params.dx * params.dx;
+  
+  let p = (
+    textureLoad(srcPressure, id + vec3<i32>(1,0,0), 0).x +
+    textureLoad(srcPressure, id - vec3<i32>(1,0,0), 0).x +
+    textureLoad(srcPressure, id + vec3<i32>(0,1,0), 0).x +
+    textureLoad(srcPressure, id - vec3<i32>(0,1,0), 0).x +
+    textureLoad(srcPressure, id + vec3<i32>(0,0,1), 0).x +
+    textureLoad(srcPressure, id - vec3<i32>(0,0,1), 0).x -
+    h_squared * textureLoad(divergence, id, 0).x
+  ) / 6.0;
+  
+  textureStore(dstPressure, id, vec4f(p, 0.0, 0.0, 0.0));
 }
 
 

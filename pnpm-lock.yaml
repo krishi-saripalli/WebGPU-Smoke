@@ -23,6 +23,9 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.0.0(react@19.0.0)
+      webgpu-utils:
+        specifier: ^1.10.0
+        version: 1.10.0
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3
@@ -1702,6 +1705,9 @@ packages:
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
+
+  webgpu-utils@1.10.0:
+    resolution: {integrity: sha512-L+mFcsv60No9yksOEJDebDtVqfNJvSu5dDKPW+rU9aUt69VXxSmZ1dhBXu9DVl280SKubJ4OmU9SnIL7CFad1g==}
 
   which-boxed-primitive@1.1.1:
     resolution: {integrity: sha512-TbX3mj8n0odCBFVlY8AxkqcHASw3L60jIuF8jFP78az3C2YhmGvqbHBpAjTRH2/xqYunrJ9g1jSyjCjpoWzIAA==}
@@ -3621,6 +3627,8 @@ snapshots:
       punycode: 2.3.1
 
   util-deprecate@1.0.2: {}
+
+  webgpu-utils@1.10.0: {}
 
   which-boxed-primitive@1.1.1:
     dependencies:

@@ -16,7 +16,8 @@
     "lil-gui": "^0.20.0",
     "next": "15.1.6",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "webgpu-utils": "^1.10.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

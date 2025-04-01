@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { WebGPUState } from './useWebGPU';
 import { Camera } from '@/modules/Camera';
 import { Vec3 } from 'gl-matrix';
-import { loadShader } from '@/utils/shader-loader';
+import { loadShader, loadShaderModules } from '@/utils/shader-loader';
 import { generateWireframe } from '@/utils/generate-wireframe';
 import { generateSlices } from '@/utils/generate-slices';
 import {
@@ -12,6 +12,12 @@ import {
 } from '@/utils/initializion';
 import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
 import * as layouts from '@/utils/layouts';
+import {
+  SHADER_PATHS,
+  COMPUTE_ENTRY_POINTS,
+  RENDER_ENTRY_POINTS,
+  createComputePipeline,
+} from '@/utils/shader-modules';
 
 export interface RenderPipelineResources {
   wireframePipeline: GPURenderPipeline;
@@ -91,14 +97,19 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         if (!webGPUState) return;
         const { device, canvasFormat } = webGPUState;
 
-        const shaderCode = await loadShader('/shaders/shader.wgsl');
-        if (!shaderCode || shaderCode.trim().length === 0) {
-          throw new Error('Invalid shader code: shader code is empty');
+        // Load a single common shader for shader definitions
+        const commonShaderCode = await loadShader(SHADER_PATHS.common);
+        if (!commonShaderCode || commonShaderCode.trim().length === 0) {
+          throw new Error('Invalid common shader code: shader code is empty');
         }
+
+        // Load all shader modules
+        const shaderModules = await loadShaderModules(device, SHADER_PATHS);
 
         const gridSize = 80;
 
-        const shaderDefs = makeShaderDataDefinitions(shaderCode);
+        // We still need to extract definitions from the common shader
+        const shaderDefs = makeShaderDataDefinitions(commonShaderCode);
 
         const internalGridSize = gridSize;
         const halosSize = 1;
@@ -694,13 +705,14 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         let shaderModule: GPUShaderModule;
         try {
-          shaderModule = device.createShaderModule({ code: shaderCode });
+          shaderModule = device.createShaderModule({ code: commonShaderCode });
         } catch (e) {
           throw new Error(
             `Failed to create shader module: ${e instanceof Error ? e.message : String(e)}`
           );
         }
 
+        // Create render pipelines
         const baseRenderPipelineDescriptor: Omit<
           GPURenderPipelineDescriptor,
           'label' | 'fragment' | 'depthStencil'
@@ -709,8 +721,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
             bindGroupLayouts: [uniformBindGroupLayout, renderTexturesBindGroupLayout],
           }),
           vertex: {
-            module: shaderModule,
-            entryPoint: 'vertexMain',
+            module: shaderModules[RENDER_ENTRY_POINTS.vertex.module],
+            entryPoint: RENDER_ENTRY_POINTS.vertex.entryPoint,
             buffers: [
               {
                 arrayStride: 12,
@@ -726,8 +738,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           ...baseRenderPipelineDescriptor,
           label: 'Slices Rendering',
           fragment: {
-            module: shaderModule,
-            entryPoint: 'fragmentSlices',
+            module: shaderModules[RENDER_ENTRY_POINTS.fragmentSlices.module],
+            entryPoint: RENDER_ENTRY_POINTS.fragmentSlices.entryPoint,
             targets: [
               {
                 format: canvasFormat,
@@ -744,133 +756,166 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           ...baseRenderPipelineDescriptor,
           label: 'Wireframe Rendering',
           fragment: {
-            module: shaderModule,
-            entryPoint: 'fragmentMain',
+            module: shaderModules[RENDER_ENTRY_POINTS.fragment.module],
+            entryPoint: RENDER_ENTRY_POINTS.fragment.entryPoint,
             targets: [{ format: canvasFormat }],
           },
           primitive: { topology: 'line-list' },
         });
 
-        const densityCopyPipeline = device.createComputePipeline({
-          label: 'Density Copy',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, densityCopyBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'densityCopy',
-          },
+        const densityCopyPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createDensityCopyBindGroupLayout(device),
+          ],
         });
+        const densityCopyPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'densityCopy',
+          densityCopyPipelineLayout,
+          'Density Copy'
+        );
 
-        const externalForcesStepPipeline = device.createComputePipeline({
-          label: 'External Forces Step',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, externalForcesStepBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'externalForcesStep',
-          },
+        const externalForcesStepPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createExternalForcesStepBindGroupLayout(device),
+          ],
         });
+        const externalForcesStepPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'externalForcesStep',
+          externalForcesStepPipelineLayout,
+          'External Forces Step'
+        );
 
-        const vorticityCalculationPipeline = device.createComputePipeline({
-          label: 'Vorticity Calculation',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, vorticityCalculationBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'vorticityCalculation',
-          },
+        const vorticityCalculationPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createVorticityCalculationBindGroupLayout(device),
+          ],
         });
+        const vorticityCalculationPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'vorticityCalculation',
+          vorticityCalculationPipelineLayout,
+          'Vorticity Calculation'
+        );
 
-        const vorticityConfinementForcePipeline = device.createComputePipeline({
-          label: 'Vorticity Confinement Force',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, vorticityConfinementForceBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'vorticityConfinementForce',
-          },
+        const vorticityConfinementForcePipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createVorticityConfinementForceBindGroupLayout(device),
+          ],
         });
+        const vorticityConfinementForcePipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'vorticityConfinementForce',
+          vorticityConfinementForcePipelineLayout,
+          'Vorticity Confinement Force'
+        );
 
-        const vorticityForceApplicationPipeline = device.createComputePipeline({
-          label: 'Vorticity Force Application',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, vorticityForceApplicationBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'vorticityForceApplication',
-          },
+        const vorticityForceApplicationPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createVorticityForceApplicationBindGroupLayout(device),
+          ],
         });
+        const vorticityForceApplicationPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'vorticityForceApplication',
+          vorticityForceApplicationPipelineLayout,
+          'Vorticity Force Application'
+        );
 
-        const velocityAdvectionPipeline = device.createComputePipeline({
-          label: 'Velocity Advection',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, velocityAdvectionBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'velocityAdvection',
-          },
+        const velocityAdvectionPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createVelocityAdvectionBindGroupLayout(device),
+          ],
         });
+        const velocityAdvectionPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'velocityAdvection',
+          velocityAdvectionPipelineLayout,
+          'Velocity Advection'
+        );
 
-        const temperatureAdvectionPipeline = device.createComputePipeline({
-          label: 'Temperature Advection',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, temperatureAdvectionBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'temperatureAdvection',
-          },
+        const temperatureAdvectionPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createTemperatureAdvectionBindGroupLayout(device),
+          ],
         });
+        const temperatureAdvectionPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'temperatureAdvection',
+          temperatureAdvectionPipelineLayout,
+          'Temperature Advection'
+        );
 
-        const densityAdvectionPipeline = device.createComputePipeline({
-          label: 'Density Advection',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, densityAdvectionBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'densityAdvection',
-          },
+        const densityAdvectionPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createDensityAdvectionBindGroupLayout(device),
+          ],
         });
+        const densityAdvectionPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'densityAdvection',
+          densityAdvectionPipelineLayout,
+          'Density Advection'
+        );
 
-        const divergenceCalculationPipeline = device.createComputePipeline({
-          label: 'Divergence Calculation',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, divergenceCalculationBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'divergenceCalculation',
-          },
+        const divergenceCalculationPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createDivergenceCalculationBindGroupLayout(device),
+          ],
         });
+        const divergenceCalculationPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'divergenceCalculation',
+          divergenceCalculationPipelineLayout,
+          'Divergence Calculation'
+        );
 
-        const pressureIterationPipeline = device.createComputePipeline({
-          label: 'Pressure Iteration (Jacobi)',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, pressureIterationBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'pressureIteration',
-          },
+        const pressureIterationPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createPressureIterationBindGroupLayout(device),
+          ],
         });
+        const pressureIterationPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'pressureIteration',
+          pressureIterationPipelineLayout,
+          'Pressure Iteration (Jacobi)'
+        );
 
-        const pressureGradientSubtractionPipeline = device.createComputePipeline({
-          label: 'Pressure Gradient Subtraction',
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, pressureGradientSubtractionBindGroupLayout],
-          }),
-          compute: {
-            module: shaderModule,
-            entryPoint: 'pressureGradientSubtraction',
-          },
+        const pressureGradientSubtractionPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createPressureGradientSubtractionBindGroupLayout(device),
+          ],
         });
+        const pressureGradientSubtractionPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'pressureGradientSubtraction',
+          pressureGradientSubtractionPipelineLayout,
+          'Pressure Gradient Subtraction'
+        );
 
         const multisampleTexture = device.createTexture({
           format: canvasFormat,

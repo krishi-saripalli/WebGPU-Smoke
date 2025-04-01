@@ -4,7 +4,7 @@ export const initializeDensity = (
   y: number,
   z: number,
   halosSize: number,
-  internalGridSize: number
+  gridSize: number
 ): number => {
   // Convert to internal grid coordinates (excluding halos)
   const internalX = x - halosSize;
@@ -14,17 +14,17 @@ export const initializeDensity = (
   // Check if we're in the internal grid area
   if (
     internalX >= 0 &&
-    internalX < internalGridSize &&
+    internalX < gridSize &&
     internalY >= 0 &&
-    internalY < internalGridSize &&
+    internalY < gridSize &&
     internalZ >= 0 &&
-    internalZ < internalGridSize
+    internalZ < gridSize
   ) {
     // Initial density: Smoke source at the bottom center area
-    const centerX = internalGridSize / 2;
-    const centerZ = internalGridSize / 2;
-    const radius = internalGridSize / 10;
-    const bottomHeight = internalGridSize / 10;
+    const centerX = gridSize / 2;
+    const centerZ = gridSize / 2;
+    const radius = gridSize / 10;
+    const bottomHeight = gridSize / 10;
 
     if (
       internalY < bottomHeight &&
@@ -47,7 +47,7 @@ export const initializeTemperature = (
   y: number,
   z: number,
   halosSize: number,
-  internalGridSize: number
+  gridSize: number
 ): number => {
   // Convert to internal grid coordinates (excluding halos)
   const internalX = x - halosSize;
@@ -57,17 +57,17 @@ export const initializeTemperature = (
   // Check if we're in the internal grid area
   if (
     internalX >= 0 &&
-    internalX < internalGridSize &&
+    internalX < gridSize &&
     internalY >= 0 &&
-    internalY < internalGridSize &&
+    internalY < gridSize &&
     internalZ >= 0 &&
-    internalZ < internalGridSize
+    internalZ < gridSize
   ) {
     // Initialize temperature: Heat source coinciding with density source
-    const centerX = internalGridSize / 2;
-    const centerZ = internalGridSize / 2;
-    const radius = internalGridSize / 10;
-    const bottomHeight = internalGridSize / 10;
+    const centerX = gridSize / 2;
+    const centerZ = gridSize / 2;
+    const radius = gridSize / 10;
+    const bottomHeight = gridSize / 10;
 
     if (
       internalY < bottomHeight &&
@@ -102,9 +102,8 @@ export const initializeVelocity = (
   y: number,
   z: number,
   halosSize: number,
-  internalGridSize: number
+  gridSize: number
 ): VelocityComponents => {
-  // Convert to internal grid coordinates (excluding halos)
   const internalX = x - halosSize;
   const internalY = y - halosSize;
   const internalZ = z - halosSize;
@@ -115,17 +114,17 @@ export const initializeVelocity = (
   // Check if we're in the internal grid area
   if (
     internalX >= 0 &&
-    internalX < internalGridSize &&
+    internalX < gridSize &&
     internalY >= 0 &&
-    internalY < internalGridSize &&
+    internalY < gridSize &&
     internalZ >= 0 &&
-    internalZ < internalGridSize
+    internalZ < gridSize
   ) {
     // Initialize upward velocity at source points
-    const centerX = internalGridSize / 2;
-    const centerZ = internalGridSize / 2;
-    const radius = internalGridSize / 10;
-    const bottomHeight = internalGridSize / 10;
+    const centerX = gridSize / 2;
+    const centerZ = gridSize / 2;
+    const radius = gridSize / 10;
+    const bottomHeight = gridSize / 10;
 
     if (
       internalY < bottomHeight &&
@@ -134,7 +133,8 @@ export const initializeVelocity = (
           (internalZ - centerZ) * (internalZ - centerZ)
       ) < radius
     ) {
-      velocity.y = 0.5; // Initial upward velocity at source
+      // velocity.y = 0.5; // Initial upward velocity at source
+      velocity.y = 1.5; // Increased upward velocity for testing
 
       // Add a slight swirl with X and Z components for more interesting motion
       // This creates a gentle vortex-like initial condition
@@ -142,9 +142,9 @@ export const initializeVelocity = (
       const dz = internalZ - centerZ;
       const distance = Math.sqrt(dx * dx + dz * dz);
       if (distance > 0) {
-        // Tangential velocity components to create swirl
-        velocity.x = 0.05 * (-dz / distance);
-        velocity.z = 0.05 * (dx / distance);
+        // Tangential velocity components to create swirl - DISABLED FOR TESTING
+        // velocity.x = 0.005 * (-dz / distance);
+        // velocity.z = 0.005 * (dx / distance);
       }
     }
   }
@@ -160,7 +160,7 @@ export const initializePressure = (
   y: number,
   z: number,
   halosSize: number,
-  internalGridSize: number
+  gridSize: number
 ): number => {
   // Pressure is initialized to zero everywhere
   return 0.0;
@@ -172,45 +172,40 @@ export const initializePressure = (
 export interface SimulationData {
   densityData: Float32Array;
   temperatureData: Float32Array;
-  velocityData: Float32Array; // Consolidated RGBA format (xyz in rgb, a is unused)
+  velocityData: Float32Array;
   pressureData: Float32Array;
 }
 
 /**
- * Initialize all simulation data for the fluid simulation
+ * Initialize all data for the simulation
  */
 export const initializeSimulationData = (
   totalGridSize: number,
   halosSize: number,
-  internalGridSize: number
+  gridSize: number
 ): SimulationData => {
   // Create arrays for all simulation fields
   const initDensityData = new Float32Array(totalGridSize * totalGridSize * totalGridSize);
   const initTemperatureData = new Float32Array(totalGridSize * totalGridSize * totalGridSize);
-  // For velocity, we need 4 components per cell (RGBA) where we'll use RGB for the XYZ velocity components
-  const initVelocityData = new Float32Array(totalGridSize * totalGridSize * totalGridSize * 4);
+  const initVelocityData = new Float32Array(totalGridSize * totalGridSize * totalGridSize * 4); //vec4
   const initPressureData = new Float32Array(totalGridSize * totalGridSize * totalGridSize);
 
-  // Fill all data arrays
   for (let z = 0; z < totalGridSize; z++) {
     for (let y = 0; y < totalGridSize; y++) {
       for (let x = 0; x < totalGridSize; x++) {
         const i = x + y * totalGridSize + z * totalGridSize * totalGridSize;
-        const velocityIndex = i * 4; // Each cell has 4 components (RGBA)
+        const velocityIndex = i * 4;
 
-        // Initialize density and temperature
-        initDensityData[i] = initializeDensity(x, y, z, halosSize, internalGridSize);
-        initTemperatureData[i] = initializeTemperature(x, y, z, halosSize, internalGridSize);
+        initDensityData[i] = initializeDensity(x, y, z, halosSize, gridSize);
+        initTemperatureData[i] = initializeTemperature(x, y, z, halosSize, gridSize);
 
-        // Initialize velocity components
-        const velocity = initializeVelocity(x, y, z, halosSize, internalGridSize);
-        initVelocityData[velocityIndex] = velocity.x; // R channel = X component
-        initVelocityData[velocityIndex + 1] = velocity.y; // G channel = Y component
-        initVelocityData[velocityIndex + 2] = velocity.z; // B channel = Z component
-        initVelocityData[velocityIndex + 3] = 0.0; // A channel = unused
+        const velocity = initializeVelocity(x, y, z, halosSize, gridSize);
+        initVelocityData[velocityIndex] = velocity.x;
+        initVelocityData[velocityIndex + 1] = velocity.y;
+        initVelocityData[velocityIndex + 2] = velocity.z;
+        initVelocityData[velocityIndex + 3] = 0.0;
 
-        // Initialize pressure
-        initPressureData[i] = initializePressure(x, y, z, halosSize, internalGridSize);
+        initPressureData[i] = initializePressure(x, y, z, halosSize, gridSize);
       }
     }
   }

@@ -7,7 +7,7 @@
   struct Uniforms {
       viewMatrix      : mat4x4<f32>,
       projectionMatrix: mat4x4<f32>,
-      gridSize        : vec3<u32>,
+      gridSize        : vec3<u32>, // This is the INTERNAL grid size (e.g., 100x100x100)
       _pad1           : u32,          // forces 16-byte alignment after vec3<u32>
       cameraForward   : vec3<f32>,
       _pad2           : f32            // forces 16-byte alignment after vec3<f32>
@@ -43,37 +43,77 @@ var densitySampler: sampler;
 
 @fragment
 fn fragmentMain(vertexOut: VertexOutput) -> @location(0) vec4f {
-  return vec4f(1.0, 0.0, 0.0, 1.0);
+  return vec4f(1.0, 1.0, 1.0, 1.0);
 }
 
 @fragment
 fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
   
   let density = textureSample(densityView, densitySampler, vertexOut.texCoord);
-  return vec4f(density.x * 1.0, density.x * 0.0, density.x * 0.0, density.x); // premultiplied alpha.
+  return vec4f(density.x * 0.5, density.x * 0.5, density.x * 0.5, density.x); // premultiplied alpha.
 }
 
 ////////////////////////////////////////////////////////////
 ///////////////////// Compute Shaders
 ////////////////////////////////////////////////////////////
 
-@group(1) @binding(0) var srcVelocity: texture_3d<f32>; // Consolidated velocity (xyz in rgb)
-@group(1) @binding(1) var srcDensity: texture_3d<f32>;
-@group(1) @binding(2) var srcTemperature: texture_3d<f32>;
-@group(1) @binding(3) var srcPressure: texture_3d<f32>;
-@group(1) @binding(4) var srcDivergence: texture_3d<f32>;
-@group(1) @binding(5) var srcVorticity: texture_3d<f32>; // 3D vector
-@group(1) @binding(6) var srcVorticityForce: texture_3d<f32>; // 3D vector
+// --- REMOVED OLD GLOBAL BINDINGS ---
 
-@group(1) @binding(7) var dstVelocity: texture_storage_3d<rgba16float, write>; // Consolidated velocity (xyz in rgb)
-@group(1) @binding(8) var dstDensity: texture_storage_3d<r32float, write>;
-@group(1) @binding(9) var dstTemperature: texture_storage_3d<r32float, write>;
-@group(1) @binding(10) var dstPressure: texture_storage_3d<r32float, write>;
-@group(1) @binding(11) var dstDivergence: texture_storage_3d<r32float, write>;
-@group(1) @binding(12) var dstVorticity: texture_storage_3d<rgba16float, write>; // 3D vector
-@group(1) @binding(13) var dstVorticityForce: texture_storage_3d<rgba16float, write>; // 3D vector
+// --- Resource declarations for densityCopy ---
+@group(1) @binding(0) var densityCopy_densityIn: texture_3d<f32>;
+@group(1) @binding(1) var densityCopy_densityOut: texture_storage_3d<r32float, write>;
 
-@group(1) @binding(14) var texSampler: sampler;
+// --- Resource declarations for externalForcesStep ---
+@group(1) @binding(0) var externalForcesStep_velocityIn: texture_3d<f32>;
+@group(1) @binding(1) var externalForcesStep_temperatureIn: texture_3d<f32>;
+@group(1) @binding(2) var externalForcesStep_densityIn: texture_3d<f32>;
+@group(1) @binding(3) var externalForcesStep_velocityOut: texture_storage_3d<rgba16float, write>;
+
+// --- Resource declarations for vorticityCalculation ---
+@group(1) @binding(0) var vorticityCalculation_velocityIn: texture_3d<f32>;
+@group(1) @binding(1) var vorticityCalculation_vorticityOut: texture_storage_3d<rgba16float, write>;
+
+// --- Resource declarations for vorticityConfinementForce ---
+@group(1) @binding(0) var vorticityConfinementForce_vorticityIn: texture_3d<f32>;
+@group(1) @binding(1) var vorticityConfinementForce_forceOut: texture_storage_3d<rgba16float, write>;
+
+// --- Resource declarations for vorticityForceApplication ---
+@group(1) @binding(0) var vorticityForceApplication_velocityIn: texture_3d<f32>;
+@group(1) @binding(1) var vorticityForceApplication_forceIn: texture_3d<f32>;
+@group(1) @binding(2) var vorticityForceApplication_velocityOut: texture_storage_3d<rgba16float, write>;
+
+// --- Resource declarations for velocityAdvection ---
+@group(1) @binding(0) var velocityAdvection_velocityIn: texture_3d<f32>; // Used for sampling coord
+@group(1) @binding(1) var velocityAdvection_sampler: sampler;
+@group(1) @binding(2) var velocityAdvection_velocityToAdvect: texture_3d<f32>; // The field being advected
+@group(1) @binding(3) var velocityAdvection_velocityOut: texture_storage_3d<rgba16float, write>;
+
+// --- Resource declarations for temperatureAdvection ---
+@group(1) @binding(0) var temperatureAdvection_velocityIn: texture_3d<f32>;
+@group(1) @binding(1) var temperatureAdvection_temperatureIn: texture_3d<f32>;
+@group(1) @binding(2) var temperatureAdvection_sampler: sampler;
+@group(1) @binding(3) var temperatureAdvection_temperatureOut: texture_storage_3d<r32float, write>;
+
+// --- Resource declarations for densityAdvection ---
+@group(1) @binding(0) var densityAdvection_velocityIn: texture_3d<f32>;
+@group(1) @binding(1) var densityAdvection_densityIn: texture_3d<f32>;
+@group(1) @binding(2) var densityAdvection_sampler: sampler;
+@group(1) @binding(3) var densityAdvection_densityOut: texture_storage_3d<r32float, write>;
+
+// --- Resource declarations for divergenceCalculation ---
+@group(1) @binding(0) var divergenceCalculation_velocityIn: texture_3d<f32>;
+@group(1) @binding(1) var divergenceCalculation_divergenceOut: texture_storage_3d<r32float, write>;
+
+// --- Resource declarations for pressureIteration (Jacobi) ---
+@group(1) @binding(0) var pressureIteration_pressureIn: texture_3d<f32>;
+@group(1) @binding(1) var pressureIteration_divergenceIn: texture_3d<f32>;
+@group(1) @binding(2) var pressureIteration_pressureOut: texture_storage_3d<r32float, write>;
+
+// --- Resource declarations for pressureGradientSubtraction ---
+@group(1) @binding(0) var pressureGradientSubtraction_velocityIn: texture_3d<f32>;
+@group(1) @binding(1) var pressureGradientSubtraction_pressureIn: texture_3d<f32>;
+@group(1) @binding(2) var pressureGradientSubtraction_velocityOut: texture_storage_3d<rgba16float, write>;
+
 
 // Simulation parameters
 struct SimulationParams {
@@ -86,45 +126,50 @@ struct SimulationParams {
 }
 @group(0) @binding(1) var<uniform> params: SimulationParams;
 
+// Helper constant for boundary checks
+const HALO_SIZE: u32 = 1u;
+
 @compute @workgroup_size(4,4,4)
-fn computeMain(@builtin(global_invocation_id) id: vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn densityCopy(@builtin(global_invocation_id) id: vec3<u32>) { // Renamed from computeMain
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
-  let density = textureLoad(srcDensity, id, 0).x;
-  
-  textureStore(dstDensity, id, vec4f(density, 0.0, 0.0, 0.0));
+  let density = textureLoad(densityCopy_densityIn, id, 0).x; // Use new var
+
+  textureStore(densityCopy_densityOut, id, vec4f(density, 0.0, 0.0, 0.0)); // Use new var
 }
 
-// TODO: Add halo cells (n+2) in the CPU allocation code to avoid out of bounds access.
 
 @compute @workgroup_size(4,4,4)
-fn applyExternalForces(@builtin(global_invocation_id) id: vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn externalForcesStep(@builtin(global_invocation_id) id: vec3<u32>) { // Renamed from applyExternalForces
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
-  let velocity = textureLoad(srcVelocity, id, 0).xyz;
-  let temp = textureLoad(srcTemperature, id, 0).x;
-  let density = textureLoad(srcDensity, id, 0).x;
+  let velocity = textureLoad(externalForcesStep_velocityIn, id, 0).xyz; // Use new var
+  let temp = textureLoad(externalForcesStep_temperatureIn, id, 0).x; // Use new var
+  let density = textureLoad(externalForcesStep_densityIn, id, 0).x; // Use new var
 
   //(Eq. 8)
   let up = vec3<f32>(0.0,1.0,0.0);
   let buoyancy = -1.0 * params.buoyancyAlpha * density * up + params.buoyancyBeta * (temp - params.ambientTemperature) * up;
 
-  textureStore(dstVelocity, id, vec4f(velocity + buoyancy, 0.0));
+  textureStore(externalForcesStep_velocityOut, id, vec4f(velocity + buoyancy, 0.0)); // Use new var
 }
 
 @compute @workgroup_size(4,4,4)
-fn computeVorticity(@builtin(global_invocation_id) id : vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn vorticityCalculation(@builtin(global_invocation_id) id : vec3<u32>) { // Renamed from computeVorticity
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
@@ -132,12 +177,12 @@ fn computeVorticity(@builtin(global_invocation_id) id : vec3<u32>) {
   let pos = vec3<i32>(id);
 
   // vorticity = curl(velocity) (Eq. 9)
-  let vp_y1 = textureLoad(srcVelocity, pos + vec3<i32>(0,1,0), 0).xyz;
-  let vn_y1 = textureLoad(srcVelocity, pos - vec3<i32>(0,1,0), 0).xyz;
-  let vp_z1 = textureLoad(srcVelocity, pos + vec3<i32>(0,0,1), 0).xyz;
-  let vn_z1 = textureLoad(srcVelocity, pos - vec3<i32>(0,0,1), 0).xyz;
-  let vp_x1 = textureLoad(srcVelocity, pos + vec3<i32>(1,0,0), 0).xyz;
-  let vn_x1 = textureLoad(srcVelocity, pos - vec3<i32>(1,0,0), 0).xyz;
+  let vp_y1 = textureLoad(vorticityCalculation_velocityIn, pos + vec3<i32>(0,1,0), 0).xyz; // Use new var
+  let vn_y1 = textureLoad(vorticityCalculation_velocityIn, pos - vec3<i32>(0,1,0), 0).xyz; // Use new var
+  let vp_z1 = textureLoad(vorticityCalculation_velocityIn, pos + vec3<i32>(0,0,1), 0).xyz; // Use new var
+  let vn_z1 = textureLoad(vorticityCalculation_velocityIn, pos - vec3<i32>(0,0,1), 0).xyz; // Use new var
+  let vp_x1 = textureLoad(vorticityCalculation_velocityIn, pos + vec3<i32>(1,0,0), 0).xyz; // Use new var
+  let vn_x1 = textureLoad(vorticityCalculation_velocityIn, pos - vec3<i32>(1,0,0), 0).xyz; // Use new var
 
   let dvz_dy = vp_y1.z - vn_y1.z;
   let dvy_dz = vp_z1.y - vn_z1.y;
@@ -148,14 +193,15 @@ fn computeVorticity(@builtin(global_invocation_id) id : vec3<u32>) {
 
   let vort = vec3<f32>(dvz_dy - dvy_dz, dvx_dz - dvz_dx, dvy_dx - dvx_dy) / (2.0 * params.dx);
 
-  textureStore(dstVorticity, id, vec4f(vort, 0.0));
+  textureStore(vorticityCalculation_vorticityOut, id, vec4f(vort, 0.0)); // Use new var
 }
 
 @compute @workgroup_size(4,4,4)
-fn computeVorticityConfinement(@builtin(global_invocation_id) id : vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn vorticityConfinementForce(@builtin(global_invocation_id) id : vec3<u32>) { // Renamed from computeVorticityConfinement
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
@@ -163,9 +209,9 @@ fn computeVorticityConfinement(@builtin(global_invocation_id) id : vec3<u32>) {
   let pos = vec3<i32>(id);
 
   // gradient of the *magnitude* of vorticity (Eq. 10)
-  let dvort_mag_dx = length(textureLoad(srcVorticity, pos + vec3<i32>(1,0,0), 0).xyz) - length(textureLoad(srcVorticity, pos - vec3<i32>(1,0,0), 0).xyz);
-  let dvort_mag_dy = length(textureLoad(srcVorticity, pos + vec3<i32>(0,1,0), 0).xyz) - length(textureLoad(srcVorticity, pos - vec3<i32>(0,1,0), 0).xyz);
-  let dvort_mag_dz = length(textureLoad(srcVorticity, pos + vec3<i32>(0,0,1), 0).xyz) - length(textureLoad(srcVorticity, pos - vec3<i32>(0,0,1), 0).xyz);
+  let dvort_mag_dx = length(textureLoad(vorticityConfinementForce_vorticityIn, pos + vec3<i32>(1,0,0), 0).xyz) - length(textureLoad(vorticityConfinementForce_vorticityIn, pos - vec3<i32>(1,0,0), 0).xyz); // Use new var
+  let dvort_mag_dy = length(textureLoad(vorticityConfinementForce_vorticityIn, pos + vec3<i32>(0,1,0), 0).xyz) - length(textureLoad(vorticityConfinementForce_vorticityIn, pos - vec3<i32>(0,1,0), 0).xyz); // Use new var
+  let dvort_mag_dz = length(textureLoad(vorticityConfinementForce_vorticityIn, pos + vec3<i32>(0,0,1), 0).xyz) - length(textureLoad(vorticityConfinementForce_vorticityIn, pos - vec3<i32>(0,0,1), 0).xyz); // Use new var
   var grad = vec3<f32>(dvort_mag_dx, dvort_mag_dy, dvort_mag_dz) / (2.0 * params.dx);
 
   let gradLength = length(grad);
@@ -176,129 +222,104 @@ fn computeVorticityConfinement(@builtin(global_invocation_id) id : vec3<u32>) {
     grad = vec3<f32>(0.0);
   }
 
-  let vort = textureLoad(srcVorticity, id, 0).xyz;
+  let vort = textureLoad(vorticityConfinementForce_vorticityIn, id, 0).xyz; // Use new var
   let confinement = params.vorticityStrength * params.dx * cross(grad, vort);
 
-  textureStore(dstVorticityForce, id, vec4f(confinement, 0.0));
+  textureStore(vorticityConfinementForce_forceOut, id, vec4f(confinement, 0.0)); // Use new var
 }
 
-// Advect velocity only
-@group(1) @binding(0) var srcVelocityForAdvectV: texture_3d<f32>;
-@group(1) @binding(1) var samplerForAdvectV: sampler;
-@group(1) @binding(2) var dstVelocityForAdvectV: texture_storage_3d<rgba16float, write>;
 
 @compute @workgroup_size(4,4,4)
-fn advectVelocity(@builtin(global_invocation_id) id : vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn velocityAdvection(@builtin(global_invocation_id) id : vec3<u32>) { // Renamed from advectVelocity
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
+    return;
+  }
+
+  // Get velocity vector at current location to calculate backtrace coord
+  let v_at_id = textureLoad(velocityAdvection_velocityIn, id, 0).xyz; // Use new var
+
+  // Calculate the coordinate to sample from (in grid space)
+  let coord_grid = vec3<f32>(id) - params.dt * v_at_id * params.dx; // Use v_at_id
+
+  // Get texture dimensions (including halo) for normalization
+  let tex_dims = vec3<f32>(uniforms.gridSize + 2u * HALO_SIZE);
+  // Convert source coordinate to normalized [0.0, 1.0] space
+  let coord_normalized = (coord_grid + 0.5) / tex_dims;
+
+  // (Eq. 2) - Advect velocity field by sampling at the backtraced coordinate
+  textureStore(velocityAdvection_velocityOut, id, vec4f(textureSampleLevel(velocityAdvection_velocityToAdvect, velocityAdvection_sampler, coord_normalized, 0.0).xyz, 0.0)); // Use new vars
+}
+
+
+@compute @workgroup_size(4,4,4)
+fn temperatureAdvection(@builtin(global_invocation_id) id : vec3<u32>) { // Renamed from advectTemperature
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
   // Get velocity vector
-  let v = textureLoad(srcVelocityForAdvectV, id, 0).xyz;
+  let v = textureLoad(temperatureAdvection_velocityIn, id, 0).xyz; // Use new var
 
   // Calculate the coordinate to sample from
-  let coord = vec3<f32>(id) - params.dt * v * params.dx;
+  let coord_grid = vec3<f32>(id) - params.dt * v * params.dx;
+  let tex_dims = vec3<f32>(uniforms.gridSize + 2u * HALO_SIZE);
+  let coord_normalized = (coord_grid + 0.5) / tex_dims;
 
-  // (Eq. 2) - Advect velocity
-  textureStore(dstVelocityForAdvectV, id, vec4f(textureSampleLevel(srcVelocityForAdvectV, samplerForAdvectV, coord, 0.0).xyz, 0.0));
-}
-
-// Advect temperature only
-@group(1) @binding(0) var srcVelocityForAdvectT: texture_3d<f32>;
-@group(1) @binding(1) var srcTemperatureForAdvectT: texture_3d<f32>;
-@group(1) @binding(2) var samplerForAdvectT: sampler;
-@group(1) @binding(3) var dstTemperatureForAdvectT: texture_storage_3d<r32float, write>;
-
-@compute @workgroup_size(4,4,4)
-fn advectTemperature(@builtin(global_invocation_id) id : vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
-    return;
-  }
-
-  // Get velocity vector
-  let v = textureLoad(srcVelocityForAdvectT, id, 0).xyz;
-
-  // Calculate the coordinate to sample from
-  let coord = vec3<f32>(id) - params.dt * v * params.dx;
-  
   // (Eq. 6) - Advect temperature
-  textureStore(dstTemperatureForAdvectT, id, textureSampleLevel(srcTemperatureForAdvectT, samplerForAdvectT, coord, 0.0));
+  textureStore(temperatureAdvection_temperatureOut, id, textureSampleLevel(temperatureAdvection_temperatureIn, temperatureAdvection_sampler, coord_normalized, 0.0)); // Use new vars
 }
 
-// Advect density only
-@group(1) @binding(0) var srcVelocityForAdvectD: texture_3d<f32>;
-@group(1) @binding(1) var srcDensityForAdvectD: texture_3d<f32>;
-@group(1) @binding(2) var samplerForAdvectD: sampler;
-@group(1) @binding(3) var dstDensityForAdvectD: texture_storage_3d<r32float, write>;
 
 @compute @workgroup_size(4,4,4)
-fn advectDensity(@builtin(global_invocation_id) id : vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn densityAdvection(@builtin(global_invocation_id) id : vec3<u32>) { // Renamed from advectDensity
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
-  // Get velocity vector
-  let v = textureLoad(srcVelocityForAdvectD, id, 0).xyz;
+  let v = textureLoad(densityAdvection_velocityIn, id, 0).xyz; // Use new var
 
   // Calculate the coordinate to sample from
-  let coord = vec3<f32>(id) - params.dt * v * params.dx;
-  
+  let coord_grid = vec3<f32>(id) - params.dt * v * params.dx;
+
+  // Get texture dimensions (including halo)
+  let tex_dims = vec3<f32>(uniforms.gridSize + 2u * HALO_SIZE);
+
+  // Convert source coordinate to normalized [0.0, 1.0] space
+  let coord_normalized = (coord_grid + 0.5) / tex_dims;
+
   // (Eq. 7) - Advect density
-  textureStore(dstDensityForAdvectD, id, textureSampleLevel(srcDensityForAdvectD, samplerForAdvectD, coord, 0.0));
+  textureStore(densityAdvection_densityOut, id, textureSampleLevel(densityAdvection_densityIn, densityAdvection_sampler, coord_normalized, 0.0)); // Use new vars
 }
 
+// REMOVED computePressure - replaced by pressureIteration (Jacobi)
+
 @compute @workgroup_size(4,4,4)
-fn computePressure(@builtin(global_invocation_id) id : vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn divergenceCalculation(@builtin(global_invocation_id) id : vec3<u32>) { // Renamed from computeDivergence
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
   // Cast id to vec3<i32> for consistent type operations
   let pos = vec3<i32>(id);
 
-  // Use Laplacian and then isolate pressure; Laplacian can be found here (https://scicomp.stackexchange.com/questions/35920/3d-laplacian-operator)
-  // p(i,j,k) = (p(i+1,j,k) + p(i-1,j,k) + p(i,j+1,k) + p(i,j-1,k) + p(i,j,k+1) + p(i,j,k-1) - h²·div(i,j,k))/6
-  let h_squared = params.dx * params.dx;
-  
-  let p = (
-    textureLoad(srcPressure, pos + vec3<i32>(1,0,0), 0).x +
-    textureLoad(srcPressure, pos - vec3<i32>(1,0,0), 0).x +
-    textureLoad(srcPressure, pos + vec3<i32>(0,1,0), 0).x +
-    textureLoad(srcPressure, pos - vec3<i32>(0,1,0), 0).x +
-    textureLoad(srcPressure, pos + vec3<i32>(0,0,1), 0).x +
-    textureLoad(srcPressure, pos - vec3<i32>(0,0,1), 0).x -
-    h_squared * textureLoad(srcDivergence, id, 0).x
-  ) / 6.0;
-  
-  textureStore(dstPressure, id, vec4f(p, 0.0, 0.0, 0.0));
-  return;
-}
-
-@compute @workgroup_size(4,4,4)
-fn computeDivergence(@builtin(global_invocation_id) id : vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
-    return;
-  }
-
-  // Cast id to vec3<i32> for consistent type operations
-  let pos = vec3<i32>(id);
-
-  let vp_x1 = textureLoad(srcVelocity, pos + vec3<i32>(1,0,0), 0).xyz;
-  let vn_x1 = textureLoad(srcVelocity, pos - vec3<i32>(1,0,0), 0).xyz;
-  let vp_y1 = textureLoad(srcVelocity, pos + vec3<i32>(0,1,0), 0).xyz;
-  let vn_y1 = textureLoad(srcVelocity, pos - vec3<i32>(0,1,0), 0).xyz;
-  let vp_z1 = textureLoad(srcVelocity, pos + vec3<i32>(0,0,1), 0).xyz;
-  let vn_z1 = textureLoad(srcVelocity, pos - vec3<i32>(0,0,1), 0).xyz;
+  let vp_x1 = textureLoad(divergenceCalculation_velocityIn, pos + vec3<i32>(1,0,0), 0).xyz; // Use new var
+  let vn_x1 = textureLoad(divergenceCalculation_velocityIn, pos - vec3<i32>(1,0,0), 0).xyz; // Use new var
+  let vp_y1 = textureLoad(divergenceCalculation_velocityIn, pos + vec3<i32>(0,1,0), 0).xyz; // Use new var
+  let vn_y1 = textureLoad(divergenceCalculation_velocityIn, pos - vec3<i32>(0,1,0), 0).xyz; // Use new var
+  let vp_z1 = textureLoad(divergenceCalculation_velocityIn, pos + vec3<i32>(0,0,1), 0).xyz; // Use new var
+  let vn_z1 = textureLoad(divergenceCalculation_velocityIn, pos - vec3<i32>(0,0,1), 0).xyz; // Use new var
 
   let dv_dx = vp_x1.x - vn_x1.x;
   let dv_dy = vp_y1.y - vn_y1.y;
@@ -306,56 +327,59 @@ fn computeDivergence(@builtin(global_invocation_id) id : vec3<u32>) {
 
   let div = (dv_dx + dv_dy + dv_dz) / (2.0 * params.dx);
 
-  textureStore(dstDivergence, id, vec4f(div, 0.0, 0.0, 0.0));
+  textureStore(divergenceCalculation_divergenceOut, id, vec4f(div, 0.0, 0.0, 0.0)); // Use new var
   return;
 }
 
 @compute @workgroup_size(4,4,4)
-fn applyPressureGradient(@builtin(global_invocation_id) id: vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn pressureGradientSubtraction(@builtin(global_invocation_id) id: vec3<u32>) { // Renamed from applyPressureGradient
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
-  
+
   // Cast id to vec3<i32> for consistent type operations
   let pos = vec3<i32>(id);
-  
-  let dp_dx = (textureLoad(srcPressure, pos + vec3<i32>(1,0,0), 0).x - 
-               textureLoad(srcPressure, pos - vec3<i32>(1,0,0), 0).x) / (2.0 * params.dx);
-               
-  let dp_dy = (textureLoad(srcPressure, pos + vec3<i32>(0,1,0), 0).x - 
-               textureLoad(srcPressure, pos - vec3<i32>(0,1,0), 0).x) / (2.0 * params.dx);
-               
-  let dp_dz = (textureLoad(srcPressure, pos + vec3<i32>(0,0,1), 0).x - 
-               textureLoad(srcPressure, pos - vec3<i32>(0,0,1), 0).x) / (2.0 * params.dx);
-  
+
+  let dp_dx = (textureLoad(pressureGradientSubtraction_pressureIn, pos + vec3<i32>(1,0,0), 0).x - // Use new var
+               textureLoad(pressureGradientSubtraction_pressureIn, pos - vec3<i32>(1,0,0), 0).x) / (2.0 * params.dx); // Use new var
+
+  let dp_dy = (textureLoad(pressureGradientSubtraction_pressureIn, pos + vec3<i32>(0,1,0), 0).x - // Use new var
+               textureLoad(pressureGradientSubtraction_pressureIn, pos - vec3<i32>(0,1,0), 0).x) / (2.0 * params.dx); // Use new var
+
+  let dp_dz = (textureLoad(pressureGradientSubtraction_pressureIn, pos + vec3<i32>(0,0,1), 0).x - // Use new var
+               textureLoad(pressureGradientSubtraction_pressureIn, pos - vec3<i32>(0,0,1), 0).x) / (2.0 * params.dx); // Use new var
+
   // Subtract pressure gradient to make velocity divergence-free (equation 5)
-  let velocity = textureLoad(srcVelocity, id, 0).xyz;
+  let velocity = textureLoad(pressureGradientSubtraction_velocityIn, id, 0).xyz; // Use new var
   let pressureGradient = vec3f(dp_dx, dp_dy, dp_dz);
-  
-  textureStore(dstVelocity, id, vec4f(velocity - pressureGradient, 0.0));
+
+  textureStore(pressureGradientSubtraction_velocityOut, id, vec4f(velocity - pressureGradient, 0.0)); // Use new var
 }
 
 @compute @workgroup_size(4,4,4)
-fn applyVorticityForce(@builtin(global_invocation_id) id: vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn vorticityForceApplication(@builtin(global_invocation_id) id: vec3<u32>) { // Renamed from applyVorticityForce
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
-  
-  let velocity = textureLoad(srcVelocity, id, 0).xyz;
-  let force = textureLoad(srcVorticityForce, id, 0).xyz;
-  
-  textureStore(dstVelocity, id, vec4f(velocity + force * params.dt, 0.0));
+
+  let velocity = textureLoad(vorticityForceApplication_velocityIn, id, 0).xyz; // Use new var
+  let force = textureLoad(vorticityForceApplication_forceIn, id, 0).xyz; // Use new var
+
+  textureStore(vorticityForceApplication_velocityOut, id, vec4f(velocity + force * params.dt, 0.0)); // Use new var
 }
 
 @compute @workgroup_size(4,4,4)
-fn solvePressureJacobi(@builtin(global_invocation_id) id: vec3<u32>) {
-  if (id.x < 1 || id.x >= uniforms.gridSize.x - 1 ||
-      id.y < 1 || id.y >= uniforms.gridSize.y - 1 ||
-      id.z < 1 || id.z >= uniforms.gridSize.z - 1) {
+fn pressureIteration(@builtin(global_invocation_id) id: vec3<u32>) { // Renamed from solvePressureJacobi
+  // Boundary check: Skip halo cells
+  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
@@ -365,16 +389,16 @@ fn solvePressureJacobi(@builtin(global_invocation_id) id: vec3<u32>) {
   // Use Laplacian and then isolate pressure; Laplacian can be found here (https://scicomp.stackexchange.com/questions/35920/3d-laplacian-operator)
   // p(i,j,k) = (p(i+1,j,k) + p(i-1,j,k) + p(i,j+1,k) + p(i,j-1,k) + p(i,j,k+1) + p(i,j,k-1) - h²·div(i,j,k))/6
   let h_squared = params.dx * params.dx;
-  
+
   let p = (
-    textureLoad(srcPressure, pos + vec3<i32>(1,0,0), 0).x +
-    textureLoad(srcPressure, pos - vec3<i32>(1,0,0), 0).x +
-    textureLoad(srcPressure, pos + vec3<i32>(0,1,0), 0).x +
-    textureLoad(srcPressure, pos - vec3<i32>(0,1,0), 0).x +
-    textureLoad(srcPressure, pos + vec3<i32>(0,0,1), 0).x +
-    textureLoad(srcPressure, pos - vec3<i32>(0,0,1), 0).x -
-    h_squared * textureLoad(srcDivergence, id, 0).x
+    textureLoad(pressureIteration_pressureIn, pos + vec3<i32>(1,0,0), 0).x + // Use new var
+    textureLoad(pressureIteration_pressureIn, pos - vec3<i32>(1,0,0), 0).x + // Use new var
+    textureLoad(pressureIteration_pressureIn, pos + vec3<i32>(0,1,0), 0).x + // Use new var
+    textureLoad(pressureIteration_pressureIn, pos - vec3<i32>(0,1,0), 0).x + // Use new var
+    textureLoad(pressureIteration_pressureIn, pos + vec3<i32>(0,0,1), 0).x + // Use new var
+    textureLoad(pressureIteration_pressureIn, pos - vec3<i32>(0,0,1), 0).x - // Use new var
+    h_squared * textureLoad(pressureIteration_divergenceIn, id, 0).x // Use new var
   ) / 6.0;
-  
-  textureStore(dstPressure, id, vec4f(p, 0.0, 0.0, 0.0));
+
+  textureStore(pressureIteration_pressureOut, id, vec4f(p, 0.0, 0.0, 0.0)); // Use new var
 }

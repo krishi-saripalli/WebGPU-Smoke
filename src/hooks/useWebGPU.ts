@@ -16,7 +16,22 @@ export const useWebGPU = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
       const adapter = await navigator.gpu.requestAdapter();
       if (!adapter) return null;
 
-      const device = await adapter.requestDevice();
+      // Check if the adapter supports filterable float textures
+      if (!adapter.features.has('float32-filterable')) {
+        console.error(
+          "Required WebGPU feature 'float32-filterable' is not supported on this browser/GPU."
+        );
+
+        return null;
+      } else {
+        console.log(
+          'Required WebGPU feature "float32-filterable" is supported on this browser/GPU!'
+        );
+      }
+
+      const device = await adapter.requestDevice({
+        requiredFeatures: ['float32-filterable'],
+      });
       const context = canvasRef.current.getContext('webgpu');
       if (!context) return null;
 

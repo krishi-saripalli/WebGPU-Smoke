@@ -2,7 +2,6 @@
 // Common definitions for all shaders
 /////////////////////////////////////////////////////////////////////////
 
-// ----- Uniforms (group 0) -----
 struct Uniforms {
     viewMatrix      : mat4x4<f32>,
     projectionMatrix: mat4x4<f32>,
@@ -14,7 +13,6 @@ struct Uniforms {
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;
 
-// Simulation parameters
 struct SimulationParams {
     dt: f32,              // time step
     dx: f32,              // grid cell size
@@ -25,5 +23,4 @@ struct SimulationParams {
 }
 @group(0) @binding(1) var<uniform> params: SimulationParams;
 
-// Helper constant for boundary checks
 const HALO_SIZE: u32 = 1u; 

@@ -1,20 +1,16 @@
-// Import common definitions
 @import "common.wgsl";
 
-// --- Resource declarations for divergence calculation ---
 @group(1) @binding(0) var velocityIn: texture_3d<f32>;
 @group(1) @binding(1) var divergenceOut: texture_storage_3d<r32float, write>;
 
 @compute @workgroup_size(4,4,4)
 fn main(@builtin(global_invocation_id) id : vec3<u32>) {
-  // Boundary check: Skip halo cells
   if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
       id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
       id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
-  // Cast id to vec3<i32> for consistent type operations
   let pos = vec3<i32>(id);
 
   let vp_x1 = textureLoad(velocityIn, pos + vec3<i32>(1,0,0), 0).xyz;

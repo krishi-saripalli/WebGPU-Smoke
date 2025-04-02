@@ -1,10 +1,8 @@
-// Import common definitions
 @import "common.wgsl";
 
-// --- Resource declarations for velocity advection ---
-@group(1) @binding(0) var velocityIn: texture_3d<f32>; // Used for sampling coord
+@group(1) @binding(0) var velocityIn: texture_3d<f32>;
 @group(1) @binding(1) var texSampler: sampler;
-@group(1) @binding(2) var velocityToAdvect: texture_3d<f32>; // The field being advected
+@group(1) @binding(2) var velocityToAdvect: texture_3d<f32>;
 @group(1) @binding(3) var velocityOut: texture_storage_3d<rgba16float, write>;
 
 @compute @workgroup_size(4,4,4)

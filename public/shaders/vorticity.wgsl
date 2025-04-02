@@ -14,7 +14,6 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
     return;
   }
 
-  // Cast id to vec3<i32> for consistent type operations
   let pos = vec3<i32>(id);
 
   // vorticity = curl(velocity) (Eq. 9)

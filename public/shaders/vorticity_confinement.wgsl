@@ -1,20 +1,16 @@
-// Import common definitions
 @import "common.wgsl";
 
-// --- Resource declarations for vorticity confinement force ---
 @group(1) @binding(0) var vorticityIn: texture_3d<f32>;
 @group(1) @binding(1) var forceOut: texture_storage_3d<rgba16float, write>;
 
 @compute @workgroup_size(4,4,4)
 fn main(@builtin(global_invocation_id) id : vec3<u32>) {
-  // Boundary check: Skip halo cells
   if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
       id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
       id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
     return;
   }
 
-  // Cast id to vec3<i32> for consistent type operations
   let pos = vec3<i32>(id);
 
   // gradient of the *magnitude* of vorticity (Eq. 10)

@@ -1,13 +1,12 @@
-// Import common definitions
 @import "common.wgsl";
 
 struct VertexInput {
-  @location(0) position: vec3f, // Object space position
+  @location(0) position: vec3f, 
 };
 
 struct VertexOutput {
-  @builtin(position) position: vec4f, // Clip space position
-  @location(0) texCoord: vec3f,        // Texture coordinates for slice rendering
+  @builtin(position) position: vec4f,
+  @location(0) texCoord: vec3f,       
 };
 
 @vertex
@@ -15,12 +14,11 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   let worldPos = vec4f(input.position, 1.0);
   let viewPos = uniforms.viewMatrix * worldPos;
-  output.texCoord = (input.position  + vec3f(1.0, 1.0, 1.0)) * 0.5; // assuming positions in [-1,1]
+  output.texCoord = (input.position  + vec3f(1.0, 1.0, 1.0)) * 0.5; // assuming positions in [-1,1] -> [0,1]
   output.position = uniforms.projectionMatrix * viewPos;
   return output;
 }
 
-// ----- Fragment Textures (group 1) -----
 @group(1) @binding(0)
 var densityView: texture_3d<f32>;
 

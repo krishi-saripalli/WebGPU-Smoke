@@ -79,18 +79,17 @@ const renderScene = (
     Math.ceil(totalGridSize / workgroupSize[1]),
     Math.ceil(totalGridSize / workgroupSize[2]),
   ];
-  const JACOBI_ITERATIONS = 40;
 
-  // Track which texture set (A or B) currently holds the valid data
-  // Initially, if shouldSwapBindGroups is true, valid data is in B; otherwise, in A
+  //TODO: Jacobi solver introduces shimmering artifacts??
+  const JACOBI_ITERATIONS = 0;
+
+  // initially, shouldSwapBindGroups is false, so  data is in A
   let dataIsInA = !shouldSwapBindGroups;
 
-  // Helper to select bind group based on data location
   const selectBindGroup = (groupA: GPUBindGroup, groupB: GPUBindGroup) => {
     return dataIsInA ? groupA : groupB;
   };
 
-  // --- 1. Apply External Forces ---
   const forcesEncoder = device.createCommandEncoder({ label: 'External Forces Encoder' });
   const forcesPass = forcesEncoder.beginComputePass({ label: 'External Forces Pass' });
   forcesPass.setPipeline(externalForcesStepPipeline);
@@ -102,9 +101,8 @@ const renderScene = (
   forcesPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   forcesPass.end();
   device.queue.submit([forcesEncoder.finish()]);
-  dataIsInA = !dataIsInA; // Flip state
+  dataIsInA = !dataIsInA;
 
-  // --- 2a. Compute Vorticity ---
   const vorticityEncoder = device.createCommandEncoder({ label: 'Vorticity Calc Encoder' });
   const vorticityPass = vorticityEncoder.beginComputePass({ label: 'Vorticity Calc Pass' });
   vorticityPass.setPipeline(vorticityCalculationPipeline);
@@ -116,7 +114,7 @@ const renderScene = (
   vorticityPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   vorticityPass.end();
   device.queue.submit([vorticityEncoder.finish()]);
-  // --- 2b. Compute Vorticity Confinement forces ---
+
   const confinementEncoder = device.createCommandEncoder({ label: 'Vorticity Conf Encoder' });
   const confinementPass = confinementEncoder.beginComputePass({ label: 'Vorticity Conf Pass' });
   confinementPass.setPipeline(vorticityConfinementForcePipeline);
@@ -128,9 +126,8 @@ const renderScene = (
   confinementPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   confinementPass.end();
   device.queue.submit([confinementEncoder.finish()]);
-  // Not flipping state - vorticity confinement computes forces from vorticity
+  // not flipping state - vorticity confinement computes forces from vorticity
 
-  // --- 2c. Apply Vorticity Force ---
   const applyVortEncoder = device.createCommandEncoder({ label: 'Apply Vorticity Encoder' });
   const applyVortPass = applyVortEncoder.beginComputePass({ label: 'Apply Vorticity Pass' });
   applyVortPass.setPipeline(vorticityForceApplicationPipeline);
@@ -142,9 +139,8 @@ const renderScene = (
   applyVortPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   applyVortPass.end();
   device.queue.submit([applyVortEncoder.finish()]);
-  dataIsInA = !dataIsInA; // Flip state after applying forces to velocity
+  dataIsInA = !dataIsInA;
 
-  // --- 3. Self-Advection (advect velocity field) ---
   const advectVelEncoder = device.createCommandEncoder({ label: 'Velocity Advect Encoder' });
   const advectVelPass = advectVelEncoder.beginComputePass({ label: 'Velocity Advect Pass' });
   advectVelPass.setPipeline(velocityAdvectionPipeline);
@@ -158,7 +154,6 @@ const renderScene = (
   device.queue.submit([advectVelEncoder.finish()]);
   dataIsInA = !dataIsInA;
 
-  // --- 4a. Compute Divergence ---
   const divergenceEncoder = device.createCommandEncoder({ label: 'Divergence Encoder' });
   const divergencePass = divergenceEncoder.beginComputePass({ label: 'Divergence Pass' });
   divergencePass.setPipeline(divergenceCalculationPipeline);
@@ -171,10 +166,8 @@ const renderScene = (
   divergencePass.end();
   device.queue.submit([divergenceEncoder.finish()]);
 
-  // Pressure iterations need independent state tracking
-  let pressureIsInA = !dataIsInA; // Initial pressure state is opposite of velocity state
+  let pressureIsInA = !dataIsInA; // initial pressure state is opposite of velocity state
 
-  // --- 4b. Solve Pressure Poisson equation (Jacobi iterations) ---
   const pressureEncoder = device.createCommandEncoder({ label: 'Pressure Solve Encoder' });
   const pressurePass = pressureEncoder.beginComputePass({ label: 'Pressure Solve Pass' });
   pressurePass.setPipeline(pressureIterationPipeline);
@@ -186,13 +179,12 @@ const renderScene = (
       pressureIsInA ? pressureIterationBindGroupA : pressureIterationBindGroupB
     );
     pressurePass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
-    pressureIsInA = !pressureIsInA; // Flip pressure state for next iteration
+    pressureIsInA = !pressureIsInA;
   }
 
   pressurePass.end();
   device.queue.submit([pressureEncoder.finish()]);
 
-  // --- 4c. Apply Pressure Gradient ---
   const pressureGradEncoder = device.createCommandEncoder({ label: 'Pressure Grad Encoder' });
   const pressureGradPass = pressureGradEncoder.beginComputePass({ label: 'Pressure Grad Pass' });
   pressureGradPass.setPipeline(pressureGradientSubtractionPipeline);
@@ -204,11 +196,8 @@ const renderScene = (
   pressureGradPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   pressureGradPass.end();
   device.queue.submit([pressureGradEncoder.finish()]);
-  dataIsInA = !pressureIsInA; // Update main state tracking based on pressure output
+  dataIsInA = !pressureIsInA;
 
-  // --- 5. Scalar Field Advection ---
-
-  // 5a. Temperature advection
   const tempAdvectEncoder = device.createCommandEncoder({ label: 'Temperature Advect Encoder' });
   const tempAdvectPass = tempAdvectEncoder.beginComputePass({ label: 'Temperature Advect Pass' });
   tempAdvectPass.setPipeline(temperatureAdvectionPipeline);
@@ -221,7 +210,6 @@ const renderScene = (
   tempAdvectPass.end();
   device.queue.submit([tempAdvectEncoder.finish()]);
 
-  // 5b. Density advection
   const densityAdvectEncoder = device.createCommandEncoder({ label: 'Density Advect Encoder' });
   const densityAdvectPass = densityAdvectEncoder.beginComputePass({ label: 'Density Advect Pass' });
   densityAdvectPass.setPipeline(densityAdvectionPipeline);
@@ -251,10 +239,10 @@ const renderScene = (
   };
   const renderPass = renderEncoder.beginRenderPass(renderPassDescriptor);
 
-  // Use final density state for rendering
+  // use final density state for rendering
   const finalRenderBindGroup = dataIsInA ? renderBindGroupA : renderBindGroupB;
 
-  // Draw wireframe
+  // wireframe
   renderPass.setPipeline(wireframePipeline);
   renderPass.setBindGroup(0, uniformBindGroup);
   renderPass.setBindGroup(1, finalRenderBindGroup);
@@ -262,7 +250,7 @@ const renderScene = (
   renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
   renderPass.drawIndexed(wireframeIndexCount);
 
-  // Draw slices
+  // transparent slices
   renderPass.setPipeline(slicesPipeline);
   renderPass.setBindGroup(1, finalRenderBindGroup);
   renderPass.setVertexBuffer(0, slicesVertexBuffer);
@@ -272,7 +260,6 @@ const renderScene = (
   renderPass.end();
   device.queue.submit([renderEncoder.finish()]);
 
-  // Return the next frame's expected starting state
   return !dataIsInA;
 };
 
@@ -284,7 +271,7 @@ export const WebGPUCanvas = () => {
   const pressedKeysRef = useRef(new Set<string>());
   const [isDragging, setIsDragging] = useState(false);
   const [prevMousePos, setPrevMousePos] = useState<{ x: number; y: number } | null>(null);
-  const shouldSwapBindGroups = useRef(false); // Start reading from A
+  const shouldSwapBindGroups = useRef(false); // start reading from A
 
   useEffect(() => {
     pressedKeysRef.current = pressedKeys;
@@ -309,7 +296,6 @@ export const WebGPUCanvas = () => {
     };
   }, [keyDownHandler, keyUpHandler]);
 
-  // Main simulation and render loop + camera movement
   useEffect(() => {
     if (!renderResources || !webGPUState?.device) return;
 
@@ -322,7 +308,6 @@ export const WebGPUCanvas = () => {
         return;
       }
 
-      // Update camera position based on keys pressed
       updateCameraPosition(renderResources.camera, pressedKeysRef.current);
 
       //TODO: use webgpu-utils
@@ -333,7 +318,7 @@ export const WebGPUCanvas = () => {
 
       webGPUState.device.queue.writeBuffer(
         renderResources.uniformBuffer,
-        0, // Offset for view matrix
+        0, // offset for view matrix
         viewMatrix as Float32Array
       );
       webGPUState.device.queue.writeBuffer(
@@ -356,7 +341,7 @@ export const WebGPUCanvas = () => {
         cancelAnimationFrame(frameId);
       }
     };
-    // Rerun effect if resources or webgpu state changes
+    // rerun effect if resources or webgpu state changes
   }, [renderResources, webGPUState]);
 
   const mouseDownHandler = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -382,7 +367,7 @@ export const WebGPUCanvas = () => {
       );
 
       if (cameraUpdated) {
-        // Update uniform buffer if camera rotation changed
+        // update uniform buffer if camera rotation changed
         const viewMatrix = renderResources.camera.getViewMatrix();
         const forward = renderResources.camera.getForward();
         const cameraForwardOffset = 16 * 4 + 16 * 4 + 3 * 4 + 4;
@@ -398,7 +383,6 @@ export const WebGPUCanvas = () => {
           forward as Float32Array
         );
 
-        // Trigger immediate render after camera update
         const nextSwapState = renderScene(
           webGPUState,
           renderResources,

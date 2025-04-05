@@ -10,7 +10,7 @@ import {
   handleMouseMove,
   handleMouseUp,
 } from '@/utils/input-handler';
-import { Mat4, Vec3 } from 'gl-matrix'; // Import Mat4 and Vec3 if not already
+import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
 
 const renderScene = (
   webGPUState: WebGPUState,

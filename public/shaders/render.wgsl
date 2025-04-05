@@ -1,5 +1,6 @@
 @import "common.wgsl";
 
+//TODO: get rid of wireframe and shade outside of the box
 struct VertexInput {
   @location(0) position: vec3f, 
 };

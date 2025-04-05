@@ -173,7 +173,6 @@ export const createVorticityForceApplicationBindGroupLayout = (
   });
 };
 
-// Layout for velocityAdvection (replaces advectVelocity)
 export const createVelocityAdvectionBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
   return device.createBindGroupLayout({
     label: 'Velocity Advection Bind Group Layout',
@@ -190,15 +189,9 @@ export const createVelocityAdvectionBindGroupLayout = (device: GPUDevice): GPUBi
         visibility: GPUShaderStage.COMPUTE,
         sampler: { type: 'filtering' },
       },
-      // velocityAdvection_velocityToAdvect (@binding(2)) - Field being advected
-      {
-        binding: 2, // Keep binding
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float', viewDimension: '3d' },
-      },
       // velocityAdvection_velocityOut (@binding(3)) - Output
       {
-        binding: 3, // Updated binding
+        binding: 2, // Updated binding
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
       },

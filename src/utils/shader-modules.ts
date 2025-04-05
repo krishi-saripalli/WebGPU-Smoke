@@ -1,23 +1,19 @@
-// This file helps manage shader modules and their entry points
-
-// Define the shader module paths
 export const SHADER_PATHS = {
   common: '/shaders/common.wgsl',
   render: '/shaders/render.wgsl',
   density: '/shaders/density.wgsl',
   forces: '/shaders/forces.wgsl',
   vorticity: '/shaders/vorticity.wgsl',
-  vortConfinement: '/shaders/vorticity_confinement.wgsl',
-  vortForce: '/shaders/vorticity_force.wgsl',
-  velAdvect: '/shaders/advect_velocity.wgsl',
-  tempAdvect: '/shaders/advect_temperature.wgsl',
-  densAdvect: '/shaders/advect_density.wgsl',
+  vorticityConfinement: '/shaders/vorticity_confinement.wgsl',
+  vorticityForce: '/shaders/vorticity_force.wgsl',
+  velocityAdvection: '/shaders/advect_velocity.wgsl',
+  temperatureAdvection: '/shaders/advect_temperature.wgsl',
+  densityAdvection: '/shaders/advect_density.wgsl',
   divergence: '/shaders/divergence.wgsl',
   pressure: '/shaders/pressure.wgsl',
-  pressureGrad: '/shaders/pressure_gradient.wgsl',
+  pressureGradient: '/shaders/pressure_gradient.wgsl',
 };
 
-// Map compute entry points to their modules
 export const COMPUTE_ENTRY_POINTS = {
   densityCopy: {
     module: 'density',
@@ -32,23 +28,23 @@ export const COMPUTE_ENTRY_POINTS = {
     entryPoint: 'main',
   },
   vorticityConfinementForce: {
-    module: 'vortConfinement',
+    module: 'vorticityConfinement',
     entryPoint: 'main',
   },
   vorticityForceApplication: {
-    module: 'vortForce',
+    module: 'vorticityForce',
     entryPoint: 'main',
   },
   velocityAdvection: {
-    module: 'velAdvect',
+    module: 'velocityAdvection',
     entryPoint: 'main',
   },
   temperatureAdvection: {
-    module: 'tempAdvect',
+    module: 'temperatureAdvection',
     entryPoint: 'main',
   },
   densityAdvection: {
-    module: 'densAdvect',
+    module: 'densityAdvection',
     entryPoint: 'main',
   },
   divergenceCalculation: {
@@ -60,12 +56,11 @@ export const COMPUTE_ENTRY_POINTS = {
     entryPoint: 'main',
   },
   pressureGradientSubtraction: {
-    module: 'pressureGrad',
+    module: 'pressureGradient',
     entryPoint: 'main',
   },
 };
 
-// Map render entry points to their modules
 export const RENDER_ENTRY_POINTS = {
   vertex: {
     module: 'render',

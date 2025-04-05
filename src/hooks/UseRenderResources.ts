@@ -5,19 +5,10 @@ import { Vec3 } from 'gl-matrix';
 import { loadShader, loadShaderModules } from '@/utils/shader-loader';
 import { generateWireframe } from '@/utils/generate-wireframe';
 import { generateSlices } from '@/utils/generate-slices';
-import {
-  initializeDensity,
-  initializeTemperature,
-  initializeSimulationData,
-} from '@/utils/initializion';
+import { initializeSimulationData } from '@/utils/initializion';
 import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
 import * as layouts from '@/utils/layouts';
-import {
-  SHADER_PATHS,
-  COMPUTE_ENTRY_POINTS,
-  RENDER_ENTRY_POINTS,
-  createComputePipeline,
-} from '@/utils/shader-modules';
+import { SHADER_PATHS, RENDER_ENTRY_POINTS, createComputePipeline } from '@/utils/shader-modules';
 
 export interface RenderPipelineResources {
   wireframePipeline: GPURenderPipeline;
@@ -97,18 +88,15 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         if (!webGPUState) return;
         const { device, canvasFormat } = webGPUState;
 
-        // Load a single common shader for shader definitions
         const commonShaderCode = await loadShader(SHADER_PATHS.common);
         if (!commonShaderCode || commonShaderCode.trim().length === 0) {
           throw new Error('Invalid common shader code: shader code is empty');
         }
 
-        // Load all shader modules
         const shaderModules = await loadShaderModules(device, SHADER_PATHS);
 
         const gridSize = 80;
 
-        // We still need to extract definitions from the common shader
         const shaderDefs = makeShaderDataDefinitions(commonShaderCode);
 
         const internalGridSize = gridSize;
@@ -124,7 +112,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         const camera = new Camera({
           position: new Vec3([0, 0, 2]),
-          forward: new Vec3([0, -0.5, -1]),
+          forward: new Vec3([0, 0, -1]),
           up: new Vec3([0, 1, 0]),
           heightAngle: Math.PI / 2,
           near: 0.1,
@@ -149,7 +137,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         });
 
         simulationParamsView.set({
-          dt: 1,
+          dt: 3,
           dx: 0.0001,
           vorticityStrength: 0.8,
           buoyancyAlpha: 0.05,
@@ -539,8 +527,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           entries: [
             { binding: 0, resource: velocityTextureA.createView() },
             { binding: 1, resource: sampler },
-            { binding: 2, resource: velocityTextureA.createView() },
-            { binding: 3, resource: velocityTextureB.createView() },
+            { binding: 2, resource: velocityTextureB.createView() },
           ],
         });
         const velocityAdvectionBindGroupB = device.createBindGroup({
@@ -548,8 +535,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           entries: [
             { binding: 0, resource: velocityTextureB.createView() },
             { binding: 1, resource: sampler },
-            { binding: 2, resource: velocityTextureB.createView() },
-            { binding: 3, resource: velocityTextureA.createView() },
+            { binding: 2, resource: velocityTextureA.createView() },
           ],
         });
 

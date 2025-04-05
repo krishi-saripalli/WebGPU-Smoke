@@ -1,5 +1,5 @@
 // Create array buffers for initial data
-export const initializeDensity = (
+const _initializeDensity = (
   x: number,
   y: number,
   z: number,
@@ -20,11 +20,10 @@ export const initializeDensity = (
     internalZ >= 0 &&
     internalZ < gridSize
   ) {
-    // Initial density: Smoke source at the bottom center area
     const centerX = gridSize / 2;
     const centerZ = gridSize / 2;
-    const radius = gridSize / 10;
-    const bottomHeight = gridSize / 10;
+    const radius = gridSize;
+    const bottomHeight = gridSize;
 
     if (
       internalY < bottomHeight &&
@@ -33,16 +32,15 @@ export const initializeDensity = (
           (internalZ - centerZ) * (internalZ - centerZ)
       ) < radius
     ) {
-      return 1.0; // Density source
+      return Math.exp(-(Math.pow(internalX - centerX, 2) + Math.pow(internalZ - centerZ, 2)) / 5);
     }
     return 0.0;
   }
 
-  // For halo cells, return 0 as default
   return 0.0;
 };
 
-export const initializeTemperature = (
+const _initializeTemperature = (
   x: number,
   y: number,
   z: number,
@@ -97,7 +95,7 @@ export interface VelocityComponents {
 /**
  * Initialize velocity components for a given cell in the grid
  */
-export const initializeVelocity = (
+const _initializeVelocity = (
   x: number,
   y: number,
   z: number,
@@ -155,7 +153,7 @@ export const initializeVelocity = (
 /**
  * Initialize pressure for a given cell in the grid
  */
-export const initializePressure = (
+const _initializePressure = (
   x: number,
   y: number,
   z: number,
@@ -196,16 +194,16 @@ export const initializeSimulationData = (
         const i = x + y * totalGridSize + z * totalGridSize * totalGridSize;
         const velocityIndex = i * 4;
 
-        initDensityData[i] = initializeDensity(x, y, z, halosSize, gridSize);
-        initTemperatureData[i] = initializeTemperature(x, y, z, halosSize, gridSize);
+        initDensityData[i] = _initializeDensity(x, y, z, halosSize, gridSize);
+        initTemperatureData[i] = _initializeTemperature(x, y, z, halosSize, gridSize);
 
-        const velocity = initializeVelocity(x, y, z, halosSize, gridSize);
+        const velocity = _initializeVelocity(x, y, z, halosSize, gridSize);
         initVelocityData[velocityIndex] = velocity.x;
         initVelocityData[velocityIndex + 1] = velocity.y;
         initVelocityData[velocityIndex + 2] = velocity.z;
         initVelocityData[velocityIndex + 3] = 0.0;
 
-        initPressureData[i] = initializePressure(x, y, z, halosSize, gridSize);
+        initPressureData[i] = _initializePressure(x, y, z, halosSize, gridSize);
       }
     }
   }

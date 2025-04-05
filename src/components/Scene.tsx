@@ -19,8 +19,7 @@ const renderScene = (
 ): boolean => {
   const { device, context, canvasFormat } = webGPUState;
   const {
-    // Render Pipelines
-    wireframePipeline,
+    // Render Pipelines,
     slicesPipeline,
     // Compute Pipelines
     densityCopyPipeline,
@@ -35,8 +34,6 @@ const renderScene = (
     pressureIterationPipeline,
     pressureGradientSubtractionPipeline,
     // Buffers
-    wireframeVertexBuffer,
-    wireframeIndexBuffer,
     slicesVertexBuffer,
     slicesIndexBuffer,
     multisampleTexture,
@@ -68,7 +65,6 @@ const renderScene = (
     renderBindGroupA,
     renderBindGroupB,
     // Counts & Sizes
-    wireframeIndexCount,
     slicesIndexCount,
     totalGridSize,
   } = renderResources;
@@ -242,13 +238,13 @@ const renderScene = (
   // use final density state for rendering
   const finalRenderBindGroup = dataIsInA ? renderBindGroupA : renderBindGroupB;
 
-  // wireframe
-  renderPass.setPipeline(wireframePipeline);
+  // TODO: get rid of wireframe
+  // renderPass.setPipeline(wireframePipeline);
   renderPass.setBindGroup(0, uniformBindGroup);
-  renderPass.setBindGroup(1, finalRenderBindGroup);
-  renderPass.setVertexBuffer(0, wireframeVertexBuffer);
-  renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
-  renderPass.drawIndexed(wireframeIndexCount);
+  // renderPass.setBindGroup(1, finalRenderBindGroup);
+  // renderPass.setVertexBuffer(0, wireframeVertexBuffer);
+  // renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
+  // renderPass.drawIndexed(wireframeIndexCount);
 
   // transparent slices
   renderPass.setPipeline(slicesPipeline);

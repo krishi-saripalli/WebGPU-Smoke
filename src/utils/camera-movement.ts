@@ -1,7 +1,7 @@
 import { vec3 } from 'gl-matrix';
 import { Camera } from '@/modules/Camera';
 
-export const MOVEMENT_SPEED = 0.01;
+export const MOVEMENT_SPEED = 0.1;
 
 export function updateCameraPosition(camera: Camera, pressedKeys: Set<string>): void {
   if (pressedKeys.size === 0) return;

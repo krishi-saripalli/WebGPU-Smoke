@@ -20,10 +20,10 @@ export function generateSlices(gridSize: number) {
     // "startIndex" = how many vertices are in vertexPositions so far
     const startIndex = vertexPositions.length / 3;
 
-    // Push the 4 corner vertices of this quad
+    // push the 4 corner vertices of this quad
     vertexPositions.push(...p0, ...p1, ...p2, ...p3);
 
-    // Add two triangles (6 indices) in CCW order:
+    // add two triangles (6 indices) in CCW order:
     //   0--1
     //   | /|
     //   2--3
@@ -41,7 +41,13 @@ export function generateSlices(gridSize: number) {
     const z = -1.0 + idx * (2.0 / gridSize);
     addQuad([-1, -1, z], [1, -1, z], [-1, 1, z], [1, 1, z]);
   }
-  //TODO: Add the other axis-aligned slices
+  //TODO: Add the other axis-aligned slices to support camera movement
+
+  // add a left and right boundary quad
+  const left_x = -1;
+  const right_x = 1;
+  addQuad([left_x, -1, -1], [left_x, 1, -1], [left_x, -1, 1], [left_x, 1, 1]);
+  addQuad([right_x, -1, -1], [right_x, 1, -1], [right_x, -1, 1], [right_x, 1, 1]);
 
   return { vertexPositions, indicesList };
 }

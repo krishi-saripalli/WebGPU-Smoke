@@ -34,5 +34,10 @@ fn fragmentMain(vertexOut: VertexOutput) -> @location(0) vec4f {
 @fragment
 fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
   let density = textureSample(densityView, densitySampler, vertexOut.texCoord);
-  return vec4f(density.x * 0.5, density.x * 0.5, density.x * 0.5, density.x); // premultiplied alpha.
+  var outer_wall = vec4f(0.0, 0.0, 0.0, 0.0);
+  if (vertexOut.texCoord.x == 0.0 || vertexOut.texCoord.x == 1.0 || vertexOut.texCoord.z == 0.0) {
+    outer_wall = vec4f(0.1, 0.1, 0.1, 0.0);
+  }
+  let grey = vec4f(0.7,0.7,0.7,1.0);
+  return vec4f(density.x * grey.x, density.x * grey.y, density.x * grey.z, density.x) + outer_wall; // premultiplied alpha.
 } 

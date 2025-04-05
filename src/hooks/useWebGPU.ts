@@ -39,6 +39,7 @@ export const useWebGPU = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
       context.configure({
         device,
         format: canvasFormat,
+        alphaMode: 'premultiplied',
       });
 
       setState({ device, context, canvasFormat });

@@ -3,7 +3,6 @@ import { WebGPUState } from './useWebGPU';
 import { Camera } from '@/modules/Camera';
 import { Vec3 } from 'gl-matrix';
 import { loadShader, loadShaderModules } from '@/utils/shader-loader';
-import { generateWireframe } from '@/utils/generate-wireframe';
 import { generateSlices } from '@/utils/generate-slices';
 import { initializeSimulationData } from '@/utils/initializion';
 import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
@@ -11,7 +10,6 @@ import * as layouts from '@/utils/layouts';
 import { SHADER_PATHS, RENDER_ENTRY_POINTS, createComputePipeline } from '@/utils/shader-modules';
 
 export interface RenderPipelineResources {
-  wireframePipeline: GPURenderPipeline;
   slicesPipeline: GPURenderPipeline;
   densityCopyPipeline: GPUComputePipeline;
   externalForcesStepPipeline: GPUComputePipeline;
@@ -24,8 +22,6 @@ export interface RenderPipelineResources {
   divergenceCalculationPipeline: GPUComputePipeline;
   pressureIterationPipeline: GPUComputePipeline;
   pressureGradientSubtractionPipeline: GPUComputePipeline;
-  wireframeVertexBuffer: GPUBuffer;
-  wireframeIndexBuffer: GPUBuffer;
   slicesVertexBuffer: GPUBuffer;
   slicesIndexBuffer: GPUBuffer;
   uniformBuffer: GPUBuffer;
@@ -56,7 +52,6 @@ export interface RenderPipelineResources {
   renderBindGroupA: GPUBindGroup;
   renderBindGroupB: GPUBindGroup;
   uniformBindGroup: GPUBindGroup;
-  wireframeIndexCount: number;
   slicesIndexCount: number;
   camera: Camera;
   gridSize: number;
@@ -137,8 +132,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         });
 
         simulationParamsView.set({
-          dt: 3,
-          dx: 0.0001,
+          dt: 0.1,
+          dx: 2.0 / gridSize,
           vorticityStrength: 0.8,
           buoyancyAlpha: 0.05,
           buoyancyBeta: 0.1,
@@ -653,24 +648,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           ],
         });
 
-        const { vertexPositions: wireframeVertexPositions, indicesList: wireframeIndicesList } =
-          generateWireframe(internalGridSize);
-
-        const wireframeVertices = new Float32Array(wireframeVertexPositions);
-        const wireframeIndices = new Uint32Array(wireframeIndicesList);
-
-        const wireframeVertexBuffer = device.createBuffer({
-          size: wireframeVertices.byteLength,
-          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
-        device.queue.writeBuffer(wireframeVertexBuffer, 0, wireframeVertices);
-
-        const wireframeIndexBuffer = device.createBuffer({
-          size: wireframeIndices.byteLength,
-          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-        });
-        device.queue.writeBuffer(wireframeIndexBuffer, 0, wireframeIndices);
-
         const { vertexPositions: slicesVertexPositions, indicesList: slicesIndicesList } =
           generateSlices(internalGridSize);
 
@@ -914,7 +891,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         });
 
         setResources({
-          wireframePipeline,
           slicesPipeline,
           densityCopyPipeline,
           externalForcesStepPipeline,
@@ -927,8 +903,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           divergenceCalculationPipeline,
           pressureIterationPipeline,
           pressureGradientSubtractionPipeline,
-          wireframeVertexBuffer,
-          wireframeIndexBuffer,
           slicesVertexBuffer,
           slicesIndexBuffer,
           uniformBuffer,
@@ -959,7 +933,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           renderBindGroupA,
           renderBindGroupB,
           uniformBindGroup,
-          wireframeIndexCount: wireframeIndices.length,
           slicesIndexCount: slicesIndices.length,
           camera,
           gridSize: internalGridSize,

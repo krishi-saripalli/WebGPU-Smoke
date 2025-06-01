@@ -22,6 +22,7 @@ export interface RenderPipelineResources {
   divergenceCalculationPipeline: GPUComputePipeline;
   pressureIterationPipeline: GPUComputePipeline;
   pressureGradientSubtractionPipeline: GPUComputePipeline;
+  reinitializationPipeline: GPUComputePipeline;
   slicesVertexBuffer: GPUBuffer;
   slicesIndexBuffer: GPUBuffer;
   uniformBuffer: GPUBuffer;
@@ -49,6 +50,8 @@ export interface RenderPipelineResources {
   pressureIterationBindGroupB: GPUBindGroup;
   pressureGradientSubtractionBindGroupA: GPUBindGroup;
   pressureGradientSubtractionBindGroupB: GPUBindGroup;
+  reinitializationBindGroupA: GPUBindGroup;
+  reinitializationBindGroupB: GPUBindGroup;
   renderBindGroupA: GPUBindGroup;
   renderBindGroupB: GPUBindGroup;
   uniformBindGroup: GPUBindGroup;
@@ -90,7 +93,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         const shaderModules = await loadShaderModules(device, SHADER_PATHS);
 
-        const gridSize = 80;
+        const gridSize = 100;
 
         const shaderDefs = makeShaderDataDefinitions(commonShaderCode);
 
@@ -135,9 +138,9 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           dt: 0.01,
           dx: 1.0 / internalGridSize,
           vorticityStrength: 2.0,
-          buoyancyAlpha: 9.8,
-          buoyancyBeta: 15.0,
-          ambientTemperature: 100,
+          buoyancyAlpha: 1.0,
+          buoyancyBeta: 50.0,
+          ambientTemperature: 1.0,
         });
 
         device.queue.writeBuffer(simulationParamsBuffer, 0, simulationParamsView.arrayBuffer);
@@ -412,6 +415,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           layouts.createPressureIterationBindGroupLayout(device);
         const pressureGradientSubtractionBindGroupLayout =
           layouts.createPressureGradientSubtractionBindGroupLayout(device);
+        const reinitializationBindGroupLayout =
+          layouts.createReinitializationBindGroupLayout(device);
 
         const sampler = device.createSampler({
           addressModeU: 'clamp-to-edge',
@@ -621,6 +626,20 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           ],
         });
 
+        const reinitializationBindGroupA = device.createBindGroup({
+          layout: reinitializationBindGroupLayout,
+          entries: [
+            { binding: 0, resource: temperatureTextureA.createView() },
+            { binding: 1, resource: densityTextureA.createView() },
+          ],
+        });
+        const reinitializationBindGroupB = device.createBindGroup({
+          layout: reinitializationBindGroupLayout,
+          entries: [
+            { binding: 0, resource: temperatureTextureB.createView() },
+            { binding: 1, resource: densityTextureB.createView() },
+          ],
+        });
         const renderBindGroupA = device.createBindGroup({
           layout: renderTexturesBindGroupLayout,
           entries: [
@@ -675,7 +694,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           );
         }
 
-        // Create render pipelines
         const baseRenderPipelineDescriptor: Omit<
           GPURenderPipelineDescriptor,
           'label' | 'fragment' | 'depthStencil'
@@ -713,17 +731,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
               },
             ],
           },
-        });
-
-        const wireframePipeline = device.createRenderPipeline({
-          ...baseRenderPipelineDescriptor,
-          label: 'Wireframe Rendering',
-          fragment: {
-            module: shaderModules[RENDER_ENTRY_POINTS.fragment.module],
-            entryPoint: RENDER_ENTRY_POINTS.fragment.entryPoint,
-            targets: [{ format: canvasFormat }],
-          },
-          primitive: { topology: 'line-list' },
         });
 
         const densityCopyPipelineLayout = device.createPipelineLayout({
@@ -880,6 +887,21 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           'Pressure Gradient Subtraction'
         );
 
+        const reinitializationPipelineLayout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            uniformBindGroupLayout,
+            layouts.createReinitializationBindGroupLayout(device),
+          ],
+        });
+
+        const reinitializationPipeline = createComputePipeline(
+          device,
+          shaderModules,
+          'reinitialization',
+          reinitializationPipelineLayout,
+          'Reinitialization'
+        );
+
         const multisampleTexture = device.createTexture({
           format: canvasFormat,
           usage: GPUTextureUsage.RENDER_ATTACHMENT,
@@ -903,6 +925,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           divergenceCalculationPipeline,
           pressureIterationPipeline,
           pressureGradientSubtractionPipeline,
+          reinitializationPipeline,
           slicesVertexBuffer,
           slicesIndexBuffer,
           uniformBuffer,
@@ -930,6 +953,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           pressureIterationBindGroupB,
           pressureGradientSubtractionBindGroupA,
           pressureGradientSubtractionBindGroupB,
+          reinitializationBindGroupA,
+          reinitializationBindGroupB,
           renderBindGroupA,
           renderBindGroupB,
           uniformBindGroup,

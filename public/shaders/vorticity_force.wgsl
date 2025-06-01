@@ -12,6 +12,22 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     return;
   }
 
+  // boundary condition
+  let is_halo_cell = id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
+      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
+      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE;
+  if (is_halo_cell) {
+
+    let interior_neighbor_coord = vec3<u32>(
+            clamp(id.x, HALO_SIZE, uniforms.gridSize.x + HALO_SIZE - 1u),
+            clamp(id.y, HALO_SIZE, uniforms.gridSize.y + HALO_SIZE - 1u),
+            clamp(id.z, HALO_SIZE, uniforms.gridSize.z + HALO_SIZE - 1u)
+        );
+    let interior_neighbor_value = textureLoad(velocityIn, interior_neighbor_coord, 0).xyz;
+    textureStore(velocityOut, id, vec4f(interior_neighbor_value, 0.0));
+    return;
+  }
+
   let velocity = textureLoad(velocityIn, id, 0).xyz;
   let force = textureLoad(forceIn, id, 0).xyz;
 

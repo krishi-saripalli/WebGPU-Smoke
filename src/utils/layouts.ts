@@ -345,3 +345,23 @@ export const createPressureGradientSubtractionBindGroupLayout = (
     ],
   });
 };
+
+export const createReinitializationBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
+  return device.createBindGroupLayout({
+    label: 'Pressure Gradient Subtraction Bind Group Layout',
+    entries: [
+      // temperatureOut (@binding(0))
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+      },
+      // densityOut (@binding(1))
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+      },
+    ],
+  });
+};

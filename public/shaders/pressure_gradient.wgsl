@@ -27,5 +27,5 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let velocity = textureLoad(velocityIn, id, 0).xyz;
   let pressureGradient = vec3f(dp_dx, dp_dy, dp_dz);
 
-  textureStore(velocityOut, id, vec4f(velocity - pressureGradient, 0.0));
+  textureStore(velocityOut, id, vec4f(velocity - pressureGradient * params.dt, 0.0)); // TODO: do I need dt here?
 } 

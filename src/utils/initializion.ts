@@ -19,8 +19,8 @@ const _initializeDensity = (
   ) {
     const centerX = gridSize / 2;
     const centerZ = gridSize / 2;
-    const radius = 10;
-    const height = 15;
+    const radius = 3;
+    const height = 3;
 
     if (
       internalY <= height &&
@@ -58,8 +58,8 @@ const _initializeTemperature = (
   ) {
     const centerX = gridSize / 2;
     const centerZ = gridSize / 2;
-    const radius = 10;
-    const height = 15;
+    const radius = gridSize / 2;
+    const height = 3;
 
     if (
       internalY <= height &&
@@ -68,9 +68,9 @@ const _initializeTemperature = (
       internalZ >= centerZ - radius &&
       internalZ <= centerZ + radius
     ) {
-      return 200.0; // hot!!;
+      return 1000.0; // hot!!;
     }
-    return 100.0; //ambient temp
+    return 1.0; //ambient temp
   }
   return 0.0;
 };

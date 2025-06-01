@@ -33,6 +33,7 @@ const renderScene = (
     divergenceCalculationPipeline,
     pressureIterationPipeline,
     pressureGradientSubtractionPipeline,
+    reinitializationPipeline,
     // Buffers
     slicesVertexBuffer,
     slicesIndexBuffer,
@@ -61,6 +62,8 @@ const renderScene = (
     pressureIterationBindGroupB,
     pressureGradientSubtractionBindGroupA,
     pressureGradientSubtractionBindGroupB,
+    reinitializationBindGroupA,
+    reinitializationBindGroupB,
     // Render Bind Groups
     renderBindGroupA,
     renderBindGroupB,
@@ -76,8 +79,8 @@ const renderScene = (
     Math.ceil(totalGridSize / workgroupSize[2]),
   ];
 
-  //TODO: Jacobi solver introduces shimmering artifacts??
-  const JACOBI_ITERATIONS = 0;
+  //TODO: Jacobi solver introduces shimmering artifacts?? Only works with even number of iters??
+  const JACOBI_ITERATIONS = 50;
 
   // initially, shouldSwapBindGroups is false, so  data is in A
   let dataIsInA = !shouldSwapBindGroups;
@@ -256,6 +259,22 @@ const renderScene = (
   renderPass.end();
   device.queue.submit([renderEncoder.finish()]);
 
+  const reinitializationEncoder = device.createCommandEncoder({
+    label: 'Reinitialization Encoder',
+  });
+  const reinitializationPass = reinitializationEncoder.beginComputePass({
+    label: 'Reinitialization Pass',
+  });
+  reinitializationPass.setPipeline(reinitializationPipeline);
+  reinitializationPass.setBindGroup(0, uniformBindGroup);
+  reinitializationPass.setBindGroup(
+    1,
+    selectBindGroup(reinitializationBindGroupB, reinitializationBindGroupA) // overwriting the output of the previous pass
+  );
+  reinitializationPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  reinitializationPass.end();
+  device.queue.submit([reinitializationEncoder.finish()]);
+
   return !dataIsInA;
 };
 
@@ -296,7 +315,6 @@ export const WebGPUCanvas = () => {
     if (!renderResources || !webGPUState?.device) return;
 
     let frameId: number;
-    let lastUpdateTime = performance.now();
 
     function animationLoop(currentTime: number) {
       if (!renderResources || !webGPUState?.device) {
@@ -326,7 +344,6 @@ export const WebGPUCanvas = () => {
       const nextSwapState = renderScene(webGPUState, renderResources, shouldSwapBindGroups.current);
       shouldSwapBindGroups.current = nextSwapState;
 
-      lastUpdateTime = currentTime;
       frameId = requestAnimationFrame(animationLoop);
     }
 

@@ -12,6 +12,7 @@ export const SHADER_PATHS = {
   divergence: '/shaders/divergence.wgsl',
   pressure: '/shaders/pressure.wgsl',
   pressureGradient: '/shaders/pressure_gradient.wgsl',
+  reinitialization: '/shaders/reinitialization.wgsl',
 };
 
 export const COMPUTE_ENTRY_POINTS = {
@@ -57,6 +58,10 @@ export const COMPUTE_ENTRY_POINTS = {
   },
   pressureGradientSubtraction: {
     module: 'pressureGradient',
+    entryPoint: 'main',
+  },
+  reinitialization: {
+    module: 'reinitialization',
     entryPoint: 'main',
   },
 };

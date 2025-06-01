@@ -17,7 +17,7 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
     let centerX = uniforms.gridSize.x / 2;
     let centerZ = uniforms.gridSize.z / 2;
     let radius = 3u;
-    let heatHeight = 3u;
+    let heatHeight = uniforms.gridSize.y;
     let densityHeight = 3u;
     if (
       id.y <= heatHeight &&
@@ -26,11 +26,11 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
       id.z >= centerZ - radius &&
       id.z <= centerZ + radius
     ) {
-      textureStore(temperatureOut, id, vec4f(params.ambientTemperature + 100.0, 1.0, 0.0, 0.0)); // hot!!;
+      textureStore(temperatureOut, id, vec4f(params.ambientTemperature + 90.0, 1.0, 0.0, 0.0)); // hot!!;
 
       //density source
       if (id.y <= densityHeight) {
-        textureStore(densityOut, id, vec4f(0.9, 0.0, 0.0, 0.0));
+        textureStore(densityOut, id, vec4f(0.2, 0.0, 0.0, 0.0));
       }
       return;
     }

@@ -21,6 +21,6 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
 
   let coord_normalized = (coord + 0.5) / tex_dims;
 
-  let dissipation = 0.99;
+  let dissipation = 1.0;
   textureStore(densityOut, id, dissipation * textureSampleLevel(densityIn, texSampler, coord_normalized, 0.0));
 } 

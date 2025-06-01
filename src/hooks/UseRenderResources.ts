@@ -132,12 +132,12 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         });
 
         simulationParamsView.set({
-          dt: 0.1,
-          dx: 0.001,
-          vorticityStrength: 0.7,
-          buoyancyAlpha: 0.05,
-          buoyancyBeta: 0.1,
-          ambientTemperature: 0.0,
+          dt: 0.01,
+          dx: 1.0 / internalGridSize,
+          vorticityStrength: 2.0,
+          buoyancyAlpha: 9.8,
+          buoyancyBeta: 15.0,
+          ambientTemperature: 100,
         });
 
         device.queue.writeBuffer(simulationParamsBuffer, 0, simulationParamsView.arrayBuffer);

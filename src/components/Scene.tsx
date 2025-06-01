@@ -77,7 +77,7 @@ const renderScene = (
   ];
 
   //TODO: Jacobi solver introduces shimmering artifacts??
-  const JACOBI_ITERATIONS = 20;
+  const JACOBI_ITERATIONS = 0;
 
   // initially, shouldSwapBindGroups is false, so  data is in A
   let dataIsInA = !shouldSwapBindGroups;

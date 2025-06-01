@@ -21,5 +21,5 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let buoyancy = -1.0 * params.buoyancyAlpha * density * up + 
                  params.buoyancyBeta * (temp - params.ambientTemperature) * up;
 
-  textureStore(velocityOut, id, vec4f(velocity + buoyancy, 0.0));
+  textureStore(velocityOut, id, vec4f(velocity + buoyancy * params.dt, 0.0));
 } 

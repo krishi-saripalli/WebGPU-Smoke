@@ -31,7 +31,7 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
   }
 
   let vorticity = textureLoad(vorticityIn, id, 0).xyz;
-  let confinement = params.dx * cross(grad, vorticity);
+  let confinement = params.dx * params.vorticityStrength * cross(grad, vorticity);
 
   textureStore(forceOut, id, vec4f(confinement, 0.0));
 } 

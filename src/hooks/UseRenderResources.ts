@@ -137,7 +137,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         simulationParamsView.set({
           dt: 0.01,
           dx: 1.0 / internalGridSize,
-          vorticityStrength: 2.0,
+          vorticityStrength: 5.0,
           buoyancyAlpha: 12.0,
           buoyancyBeta: 20.0,
           ambientTemperature: 1.0,

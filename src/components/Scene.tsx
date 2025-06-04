@@ -79,8 +79,8 @@ const renderScene = (
     Math.ceil(totalGridSize / workgroupSize[2]),
   ];
 
-  //TODO: Jacobi solver introduces shimmering artifacts?? Only works with even number of iters??
-  const JACOBI_ITERATIONS = 30;
+  //TODO: Different behaviour for even and odd number of iterations?
+  const JACOBI_ITERATIONS = 32;
 
   // initially, shouldSwapBindGroups is false, so  data is in A
   let dataIsInA = !shouldSwapBindGroups;
@@ -195,7 +195,7 @@ const renderScene = (
   pressureGradPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   pressureGradPass.end();
   device.queue.submit([pressureGradEncoder.finish()]);
-  dataIsInA = !pressureIsInA;
+  dataIsInA = !dataIsInA;
 
   const tempAdvectEncoder = device.createCommandEncoder({ label: 'Temperature Advect Encoder' });
   const tempAdvectPass = tempAdvectEncoder.beginComputePass({ label: 'Temperature Advect Pass' });
@@ -208,6 +208,7 @@ const renderScene = (
   tempAdvectPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   tempAdvectPass.end();
   device.queue.submit([tempAdvectEncoder.finish()]);
+  dataIsInA = !dataIsInA;
 
   const densityAdvectEncoder = device.createCommandEncoder({ label: 'Density Advect Encoder' });
   const densityAdvectPass = densityAdvectEncoder.beginComputePass({ label: 'Density Advect Pass' });
@@ -220,6 +221,7 @@ const renderScene = (
   densityAdvectPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   densityAdvectPass.end();
   device.queue.submit([densityAdvectEncoder.finish()]);
+  dataIsInA = !dataIsInA;
 
   const reinitializationEncoder = device.createCommandEncoder({
     label: 'Reinitialization Encoder',
@@ -236,6 +238,7 @@ const renderScene = (
   reinitializationPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   reinitializationPass.end();
   device.queue.submit([reinitializationEncoder.finish()]);
+  dataIsInA = !dataIsInA;
 
   /////////////////////////////////////////////////////////////////////////
   // Render pass

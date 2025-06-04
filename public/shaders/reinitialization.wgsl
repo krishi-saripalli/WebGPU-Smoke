@@ -31,28 +31,35 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
         return;
     }
 
-    //var currentVelocity = textureLoad(velocityIn, id, 0).xyz;
+    
 
 
-    let centerX = uniforms.gridSize.x / 2;
+
+    let centerX = uniforms.gridSize.x / 2 ;
     let centerZ = uniforms.gridSize.z / 2;
     let radius = 3u;
     let heatHeight = uniforms.gridSize.y; 
     let densityHeight = 3u;        
 
     if (
-      id.y < heatHeight && 
+      id.y <= heatHeight && 
       id.x >= centerX - radius &&
       id.x <= centerX + radius &&
       id.z >= centerZ - radius &&
       id.z <= centerZ + radius
     ) {
-      textureStore(temperatureOut, id, vec4f(params.ambientTemperature + 50.0, 0.0, 0.0, 0.0));
+      textureStore(temperatureOut, id, vec4f(params.ambientTemperature + 100.0, 0.0, 0.0, 0.0));
 
       if (id.y <= densityHeight) { 
         textureStore(densityOut, id, vec4f(1.0, 0.0, 0.0, 0.0));
       }
+      return;
     }
+
+    
+
+
+}
 
    
     

@@ -14,5 +14,5 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
   let velocity = textureLoad(velocityIn, id, 0).xyz;
   let vorticity = textureLoad(vorticityIn, id, 0).xyz;
-  textureStore(velocityOut, id, vec4f(velocity + params.vorticityStrength * vorticity * params.dt, 0.0));
+  textureStore(velocityOut, id, vec4f(velocity +  vorticity * params.dt, 0.0));
 } 

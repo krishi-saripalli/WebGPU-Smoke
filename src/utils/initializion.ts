@@ -58,7 +58,7 @@ const _initializeTemperature = (
   ) {
     const centerX = gridSize / 2;
     const centerZ = gridSize / 2;
-    const radius = gridSize / 2;
+    const radius = 3;
     const height = gridSize;
 
     if (
@@ -68,7 +68,7 @@ const _initializeTemperature = (
       internalZ >= centerZ - radius &&
       internalZ <= centerZ + radius
     ) {
-      return 100.0; // hot!!;
+      return 50.0; // hot!!;
     }
     return 1.0; //ambient temp
   }

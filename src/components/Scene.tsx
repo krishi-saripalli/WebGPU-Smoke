@@ -221,6 +221,22 @@ const renderScene = (
   densityAdvectPass.end();
   device.queue.submit([densityAdvectEncoder.finish()]);
 
+  const reinitializationEncoder = device.createCommandEncoder({
+    label: 'Reinitialization Encoder',
+  });
+  const reinitializationPass = reinitializationEncoder.beginComputePass({
+    label: 'Reinitialization Pass',
+  });
+  reinitializationPass.setPipeline(reinitializationPipeline);
+  reinitializationPass.setBindGroup(0, uniformBindGroup);
+  reinitializationPass.setBindGroup(
+    1,
+    selectBindGroup(reinitializationBindGroupA, reinitializationBindGroupB) // overwriting the output of the previous pass
+  );
+  reinitializationPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  reinitializationPass.end();
+  device.queue.submit([reinitializationEncoder.finish()]);
+
   /////////////////////////////////////////////////////////////////////////
   // Render pass
   /////////////////////////////////////////////////////////////////////////
@@ -258,22 +274,6 @@ const renderScene = (
 
   renderPass.end();
   device.queue.submit([renderEncoder.finish()]);
-
-  const reinitializationEncoder = device.createCommandEncoder({
-    label: 'Reinitialization Encoder',
-  });
-  const reinitializationPass = reinitializationEncoder.beginComputePass({
-    label: 'Reinitialization Pass',
-  });
-  reinitializationPass.setPipeline(reinitializationPipeline);
-  reinitializationPass.setBindGroup(0, uniformBindGroup);
-  reinitializationPass.setBindGroup(
-    1,
-    selectBindGroup(reinitializationBindGroupB, reinitializationBindGroupA) // overwriting the output of the previous pass
-  );
-  reinitializationPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
-  reinitializationPass.end();
-  device.queue.submit([reinitializationEncoder.finish()]);
 
   return !dataIsInA;
 };

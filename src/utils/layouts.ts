@@ -362,6 +362,18 @@ export const createReinitializationBindGroupLayout = (device: GPUDevice): GPUBin
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
       },
+      // velocityIn (@binding(2))
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float', viewDimension: '3d' },
+      },
+      // velocityOut (@binding(3))
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
+      },
     ],
   });
 };

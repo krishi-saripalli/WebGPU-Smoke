@@ -20,5 +20,6 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
   let coord_normalized = (coord + 0.5) / tex_dims;
 
   // (Eq. 2) - Advect velocity field by sampling at the backtraced coordinate
-  textureStore(velocityOut, id, vec4f(textureSampleLevel(velocityIn, texSampler, coord_normalized, 0.0).xyz, 0.0));
+  let dissipation = 0.999;
+  textureStore(velocityOut, id, dissipation * vec4f(textureSampleLevel(velocityIn, texSampler, coord_normalized, 0.0).xyz, 0.0));
 } 

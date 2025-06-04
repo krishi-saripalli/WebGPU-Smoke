@@ -93,7 +93,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         const shaderModules = await loadShaderModules(device, SHADER_PATHS);
 
-        const gridSize = 100;
+        const gridSize = 50;
 
         const shaderDefs = makeShaderDataDefinitions(commonShaderCode);
 
@@ -138,8 +138,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           dt: 0.01,
           dx: 1.0 / internalGridSize,
           vorticityStrength: 2.0,
-          buoyancyAlpha: 1.0,
-          buoyancyBeta: 50.0,
+          buoyancyAlpha: 12.0,
+          buoyancyBeta: 20.0,
           ambientTemperature: 1.0,
         });
 
@@ -629,15 +629,19 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const reinitializationBindGroupA = device.createBindGroup({
           layout: reinitializationBindGroupLayout,
           entries: [
-            { binding: 0, resource: temperatureTextureA.createView() },
-            { binding: 1, resource: densityTextureA.createView() },
+            { binding: 0, resource: temperatureTextureB.createView() },
+            { binding: 1, resource: densityTextureB.createView() },
+            { binding: 2, resource: velocityTextureA.createView() },
+            { binding: 3, resource: velocityTextureB.createView() },
           ],
         });
         const reinitializationBindGroupB = device.createBindGroup({
           layout: reinitializationBindGroupLayout,
           entries: [
-            { binding: 0, resource: temperatureTextureB.createView() },
-            { binding: 1, resource: densityTextureB.createView() },
+            { binding: 0, resource: temperatureTextureA.createView() },
+            { binding: 1, resource: densityTextureA.createView() },
+            { binding: 2, resource: velocityTextureB.createView() },
+            { binding: 3, resource: velocityTextureA.createView() },
           ],
         });
         const renderBindGroupA = device.createBindGroup({

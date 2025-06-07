@@ -69,15 +69,15 @@ const renderScene = (
     totalGridSize,
   } = renderResources;
 
-  const workgroupSize = [4, 4, 4];
-  const numWorkgroups = [
+  const workgroupSize: [number, number, number] = [4, 4, 4];
+  const numWorkgroups: [number, number, number] = [
     Math.ceil(totalGridSize / workgroupSize[0]),
     Math.ceil(totalGridSize / workgroupSize[1]),
     Math.ceil(totalGridSize / workgroupSize[2]),
   ];
 
   //TODO: Different behaviour for even and odd number of iterations?
-  const JACOBI_ITERATIONS = 32;
+  const JACOBI_ITERATIONS = 80;
 
   // initially, shouldSwapBindGroups is false, so  data is in A
   let dataIsInA = !shouldSwapBindGroups;
@@ -94,7 +94,7 @@ const renderScene = (
     1,
     selectBindGroup(externalForcesStepBindGroupA, externalForcesStepBindGroupB)
   );
-  forcesPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  forcesPass.dispatchWorkgroups(...numWorkgroups);
   forcesPass.end();
   device.queue.submit([forcesEncoder.finish()]);
   dataIsInA = !dataIsInA;
@@ -107,7 +107,7 @@ const renderScene = (
     1,
     selectBindGroup(vorticityCalculationBindGroupA, vorticityCalculationBindGroupB)
   );
-  vorticityPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  vorticityPass.dispatchWorkgroups(...numWorkgroups);
   vorticityPass.end();
   device.queue.submit([vorticityEncoder.finish()]);
 
@@ -119,7 +119,7 @@ const renderScene = (
     1,
     selectBindGroup(vorticityConfinementBindGroupA, vorticityConfinementBindGroupB)
   );
-  confinementPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  confinementPass.dispatchWorkgroups(...numWorkgroups);
   confinementPass.end();
   device.queue.submit([confinementEncoder.finish()]);
   dataIsInA = !dataIsInA;
@@ -132,7 +132,7 @@ const renderScene = (
     1,
     selectBindGroup(velocityAdvectionBindGroupA, velocityAdvectionBindGroupB)
   );
-  advectVelPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  advectVelPass.dispatchWorkgroups(...numWorkgroups);
   advectVelPass.end();
   device.queue.submit([advectVelEncoder.finish()]);
   dataIsInA = !dataIsInA;
@@ -145,7 +145,7 @@ const renderScene = (
     1,
     selectBindGroup(divergenceCalculationBindGroupA, divergenceCalculationBindGroupB)
   );
-  divergencePass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  divergencePass.dispatchWorkgroups(...numWorkgroups);
   divergencePass.end();
   device.queue.submit([divergenceEncoder.finish()]);
 
@@ -161,7 +161,7 @@ const renderScene = (
       1,
       pressureIsInA ? pressureIterationBindGroupA : pressureIterationBindGroupB
     );
-    pressurePass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+    pressurePass.dispatchWorkgroups(...numWorkgroups);
     pressureIsInA = !pressureIsInA;
   }
 
@@ -176,7 +176,7 @@ const renderScene = (
     1,
     pressureIsInA ? pressureGradientSubtractionBindGroupA : pressureGradientSubtractionBindGroupB
   );
-  pressureGradPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  pressureGradPass.dispatchWorkgroups(...numWorkgroups);
   pressureGradPass.end();
   device.queue.submit([pressureGradEncoder.finish()]);
   dataIsInA = !dataIsInA;
@@ -189,7 +189,7 @@ const renderScene = (
     1,
     selectBindGroup(temperatureAdvectionBindGroupA, temperatureAdvectionBindGroupB)
   );
-  tempAdvectPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  tempAdvectPass.dispatchWorkgroups(...numWorkgroups);
   tempAdvectPass.end();
   device.queue.submit([tempAdvectEncoder.finish()]);
   dataIsInA = !dataIsInA;
@@ -202,7 +202,7 @@ const renderScene = (
     1,
     selectBindGroup(densityAdvectionBindGroupA, densityAdvectionBindGroupB)
   );
-  densityAdvectPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  densityAdvectPass.dispatchWorkgroups(...numWorkgroups);
   densityAdvectPass.end();
   device.queue.submit([densityAdvectEncoder.finish()]);
   dataIsInA = !dataIsInA;
@@ -219,7 +219,7 @@ const renderScene = (
     1,
     selectBindGroup(reinitializationBindGroupA, reinitializationBindGroupB) // overwriting the output of the previous pass
   );
-  reinitializationPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
+  reinitializationPass.dispatchWorkgroups(...numWorkgroups);
   reinitializationPass.end();
   device.queue.submit([reinitializationEncoder.finish()]);
   dataIsInA = !dataIsInA;

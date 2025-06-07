@@ -325,29 +325,41 @@ export const createPressureGradientSubtractionBindGroupLayout = (
 
 export const createReinitializationBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
   return device.createBindGroupLayout({
-    label: 'Pressure Gradient Subtraction Bind Group Layout',
+    label: 'Reinitialization Bind Group Layout',
     entries: [
-      // temperatureOut (@binding(0))
+      // temperatureIn (@binding(0)))
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+        texture: { sampleType: 'float', viewDimension: '3d' },
       },
-      // densityOut (@binding(1))
+      // temperatureOut (@binding(1))
       {
         binding: 1,
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
       },
-      // velocityIn (@binding(2))
+      // densityIn (@binding(2))
       {
         binding: 2,
         visibility: GPUShaderStage.COMPUTE,
         texture: { sampleType: 'float', viewDimension: '3d' },
       },
-      // velocityOut (@binding(3))
+      // densityOut (@binding(3))
       {
         binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+      },
+      // velocityIn (@binding(4))
+      {
+        binding: 4,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float', viewDimension: '3d' },
+      },
+      // velocityOut (@binding(5))
+      {
+        binding: 5,
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
       },

@@ -134,9 +134,9 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         simulationParamsView.set({
           dt: 0.01,
           dx: 1.0 / internalGridSize,
-          vorticityStrength: 5.0,
+          vorticityStrength: 1.0,
           buoyancyAlpha: 12.0,
-          buoyancyBeta: 20.0,
+          buoyancyBeta: 18.0,
           ambientTemperature: 1.0,
         });
 
@@ -609,19 +609,23 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const reinitializationBindGroupA = device.createBindGroup({
           layout: reinitializationBindGroupLayout,
           entries: [
-            { binding: 0, resource: temperatureTextureB.createView() },
-            { binding: 1, resource: densityTextureB.createView() },
-            { binding: 2, resource: velocityTextureA.createView() },
-            { binding: 3, resource: velocityTextureB.createView() },
+            { binding: 0, resource: temperatureTextureA.createView() },
+            { binding: 1, resource: temperatureTextureB.createView() },
+            { binding: 2, resource: densityTextureA.createView() },
+            { binding: 3, resource: densityTextureB.createView() },
+            { binding: 4, resource: velocityTextureA.createView() },
+            { binding: 5, resource: velocityTextureB.createView() },
           ],
         });
         const reinitializationBindGroupB = device.createBindGroup({
           layout: reinitializationBindGroupLayout,
           entries: [
-            { binding: 0, resource: temperatureTextureA.createView() },
-            { binding: 1, resource: densityTextureA.createView() },
-            { binding: 2, resource: velocityTextureB.createView() },
-            { binding: 3, resource: velocityTextureA.createView() },
+            { binding: 0, resource: temperatureTextureB.createView() },
+            { binding: 1, resource: temperatureTextureA.createView() },
+            { binding: 2, resource: densityTextureB.createView() },
+            { binding: 3, resource: densityTextureA.createView() },
+            { binding: 4, resource: velocityTextureB.createView() },
+            { binding: 5, resource: velocityTextureA.createView() },
           ],
         });
         const renderBindGroupA = device.createBindGroup({

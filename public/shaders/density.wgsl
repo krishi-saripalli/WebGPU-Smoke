@@ -12,5 +12,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   }
 
   let density = textureLoad(densityIn, id, 0).x;
+  
   textureStore(densityOut, id, vec4f(density, 0.0, 0.0, 0.0));
 } 

@@ -25,8 +25,7 @@ const renderScene = (
     densityCopyPipeline,
     externalForcesStepPipeline,
     vorticityCalculationPipeline,
-    vorticityConfinementForcePipeline,
-    vorticityForceApplicationPipeline,
+    vorticityConfinementPipeline,
     velocityAdvectionPipeline,
     temperatureAdvectionPipeline,
     densityAdvectionPipeline,
@@ -46,10 +45,8 @@ const renderScene = (
     externalForcesStepBindGroupB,
     vorticityCalculationBindGroupA,
     vorticityCalculationBindGroupB,
-    vorticityConfinementForceBindGroupA,
-    vorticityConfinementForceBindGroupB,
-    vorticityForceApplicationBindGroupA,
-    vorticityForceApplicationBindGroupB,
+    vorticityConfinementBindGroupA,
+    vorticityConfinementBindGroupB,
     velocityAdvectionBindGroupA,
     velocityAdvectionBindGroupB,
     temperatureAdvectionBindGroupA,
@@ -116,28 +113,15 @@ const renderScene = (
 
   const confinementEncoder = device.createCommandEncoder({ label: 'Vorticity Conf Encoder' });
   const confinementPass = confinementEncoder.beginComputePass({ label: 'Vorticity Conf Pass' });
-  confinementPass.setPipeline(vorticityConfinementForcePipeline);
+  confinementPass.setPipeline(vorticityConfinementPipeline);
   confinementPass.setBindGroup(0, uniformBindGroup);
   confinementPass.setBindGroup(
     1,
-    selectBindGroup(vorticityConfinementForceBindGroupA, vorticityConfinementForceBindGroupB)
+    selectBindGroup(vorticityConfinementBindGroupA, vorticityConfinementBindGroupB)
   );
   confinementPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
   confinementPass.end();
   device.queue.submit([confinementEncoder.finish()]);
-  // not flipping state - vorticity confinement computes forces from vorticity
-
-  const applyVortEncoder = device.createCommandEncoder({ label: 'Apply Vorticity Encoder' });
-  const applyVortPass = applyVortEncoder.beginComputePass({ label: 'Apply Vorticity Pass' });
-  applyVortPass.setPipeline(vorticityForceApplicationPipeline);
-  applyVortPass.setBindGroup(0, uniformBindGroup);
-  applyVortPass.setBindGroup(
-    1,
-    selectBindGroup(vorticityForceApplicationBindGroupA, vorticityForceApplicationBindGroupB)
-  );
-  applyVortPass.dispatchWorkgroups(numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
-  applyVortPass.end();
-  device.queue.submit([applyVortEncoder.finish()]);
   dataIsInA = !dataIsInA;
 
   const advectVelEncoder = device.createCommandEncoder({ label: 'Velocity Advect Encoder' });

@@ -14,8 +14,7 @@ export interface RenderPipelineResources {
   densityCopyPipeline: GPUComputePipeline;
   externalForcesStepPipeline: GPUComputePipeline;
   vorticityCalculationPipeline: GPUComputePipeline;
-  vorticityConfinementForcePipeline: GPUComputePipeline;
-  vorticityForceApplicationPipeline: GPUComputePipeline;
+  vorticityConfinementPipeline: GPUComputePipeline;
   velocityAdvectionPipeline: GPUComputePipeline;
   temperatureAdvectionPipeline: GPUComputePipeline;
   densityAdvectionPipeline: GPUComputePipeline;
@@ -34,10 +33,8 @@ export interface RenderPipelineResources {
   externalForcesStepBindGroupB: GPUBindGroup;
   vorticityCalculationBindGroupA: GPUBindGroup;
   vorticityCalculationBindGroupB: GPUBindGroup;
-  vorticityConfinementForceBindGroupA: GPUBindGroup;
-  vorticityConfinementForceBindGroupB: GPUBindGroup;
-  vorticityForceApplicationBindGroupA: GPUBindGroup;
-  vorticityForceApplicationBindGroupB: GPUBindGroup;
+  vorticityConfinementBindGroupA: GPUBindGroup;
+  vorticityConfinementBindGroupB: GPUBindGroup;
   velocityAdvectionBindGroupA: GPUBindGroup;
   velocityAdvectionBindGroupB: GPUBindGroup;
   temperatureAdvectionBindGroupA: GPUBindGroup;
@@ -399,10 +396,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           layouts.createExternalForcesStepBindGroupLayout(device);
         const vorticityCalculationBindGroupLayout =
           layouts.createVorticityCalculationBindGroupLayout(device);
-        const vorticityConfinementForceBindGroupLayout =
-          layouts.createVorticityConfinementForceBindGroupLayout(device);
-        const vorticityForceApplicationBindGroupLayout =
-          layouts.createVorticityForceApplicationBindGroupLayout(device);
+        const vorticityConfinementBindGroupLayout =
+          layouts.createVorticityConfinementBindGroupLayout(device);
         const velocityAdvectionBindGroupLayout =
           layouts.createVelocityAdvectionBindGroupLayout(device);
         const temperatureAdvectionBindGroupLayout =
@@ -490,34 +485,19 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           ],
         });
 
-        const vorticityConfinementForceBindGroupA = device.createBindGroup({
-          layout: vorticityConfinementForceBindGroupLayout,
+        const vorticityConfinementBindGroupA = device.createBindGroup({
+          layout: vorticityConfinementBindGroupLayout,
           entries: [
             { binding: 0, resource: vorticityTextureA.createView() },
-            { binding: 1, resource: vorticityForceTextureB.createView() },
-          ],
-        });
-        const vorticityConfinementForceBindGroupB = device.createBindGroup({
-          layout: vorticityConfinementForceBindGroupLayout,
-          entries: [
-            { binding: 0, resource: vorticityTextureB.createView() },
-            { binding: 1, resource: vorticityForceTextureA.createView() },
-          ],
-        });
-
-        const vorticityForceApplicationBindGroupA = device.createBindGroup({
-          layout: vorticityForceApplicationBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureA.createView() },
-            { binding: 1, resource: vorticityForceTextureA.createView() },
+            { binding: 1, resource: velocityTextureA.createView() },
             { binding: 2, resource: velocityTextureB.createView() },
           ],
         });
-        const vorticityForceApplicationBindGroupB = device.createBindGroup({
-          layout: vorticityForceApplicationBindGroupLayout,
+        const vorticityConfinementBindGroupB = device.createBindGroup({
+          layout: vorticityConfinementBindGroupLayout,
           entries: [
-            { binding: 0, resource: velocityTextureB.createView() },
-            { binding: 1, resource: vorticityForceTextureB.createView() },
+            { binding: 0, resource: vorticityTextureB.createView() },
+            { binding: 1, resource: velocityTextureB.createView() },
             { binding: 2, resource: velocityTextureA.createView() },
           ],
         });
@@ -779,32 +759,18 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           'Vorticity Calculation'
         );
 
-        const vorticityConfinementForcePipelineLayout = device.createPipelineLayout({
+        const vorticityConfinementPipelineLayout = device.createPipelineLayout({
           bindGroupLayouts: [
             uniformBindGroupLayout,
-            layouts.createVorticityConfinementForceBindGroupLayout(device),
+            layouts.createVorticityConfinementBindGroupLayout(device),
           ],
         });
-        const vorticityConfinementForcePipeline = createComputePipeline(
+        const vorticityConfinementPipeline = createComputePipeline(
           device,
           shaderModules,
-          'vorticityConfinementForce',
-          vorticityConfinementForcePipelineLayout,
-          'Vorticity Confinement Force'
-        );
-
-        const vorticityForceApplicationPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createVorticityForceApplicationBindGroupLayout(device),
-          ],
-        });
-        const vorticityForceApplicationPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'vorticityForceApplication',
-          vorticityForceApplicationPipelineLayout,
-          'Vorticity Force Application'
+          'vorticityConfinement',
+          vorticityConfinementPipelineLayout,
+          'Vorticity Confinement'
         );
 
         const velocityAdvectionPipelineLayout = device.createPipelineLayout({
@@ -921,8 +887,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           densityCopyPipeline,
           externalForcesStepPipeline,
           vorticityCalculationPipeline,
-          vorticityConfinementForcePipeline,
-          vorticityForceApplicationPipeline,
+          vorticityConfinementPipeline,
           velocityAdvectionPipeline,
           temperatureAdvectionPipeline,
           densityAdvectionPipeline,
@@ -941,10 +906,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           externalForcesStepBindGroupB,
           vorticityCalculationBindGroupA,
           vorticityCalculationBindGroupB,
-          vorticityConfinementForceBindGroupA,
-          vorticityConfinementForceBindGroupB,
-          vorticityForceApplicationBindGroupA,
-          vorticityForceApplicationBindGroupB,
+          vorticityConfinementBindGroupA,
+          vorticityConfinementBindGroupB,
           velocityAdvectionBindGroupA,
           velocityAdvectionBindGroupB,
           temperatureAdvectionBindGroupA,

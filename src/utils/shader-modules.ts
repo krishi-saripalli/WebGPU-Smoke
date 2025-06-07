@@ -5,7 +5,6 @@ export const SHADER_PATHS = {
   forces: '/shaders/forces.wgsl',
   vorticity: '/shaders/vorticity.wgsl',
   vorticityConfinement: '/shaders/vorticity_confinement.wgsl',
-  vorticityForce: '/shaders/vorticity_force.wgsl',
   velocityAdvection: '/shaders/advect_velocity.wgsl',
   temperatureAdvection: '/shaders/advect_temperature.wgsl',
   densityAdvection: '/shaders/advect_density.wgsl',
@@ -28,12 +27,8 @@ export const COMPUTE_ENTRY_POINTS = {
     module: 'vorticity',
     entryPoint: 'main',
   },
-  vorticityConfinementForce: {
+  vorticityConfinement: {
     module: 'vorticityConfinement',
-    entryPoint: 'main',
-  },
-  vorticityForceApplication: {
-    module: 'vorticityForce',
     entryPoint: 'main',
   },
   velocityAdvection: {

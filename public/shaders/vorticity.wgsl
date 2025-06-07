@@ -31,7 +31,7 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
   let dvy_dx = vp_x1.y - vn_x1.y;
   let dvx_dy = vp_y1.x - vn_y1.x;
 
-  let vort = vec3<f32>(dvz_dy - dvy_dz, dvx_dz - dvz_dx, dvy_dx - dvx_dy) / (2.0 * params.dx);
+  let vorticity = vec3<f32>(dvz_dy - dvy_dz, dvx_dz - dvz_dx, dvy_dx - dvx_dy) / (2.0 * params.dx);
 
-  textureStore(vorticityOut, id, vec4f(vort, 0.0));
+  textureStore(vorticityOut, id, vec4f(vorticity, 0.0));
 } 

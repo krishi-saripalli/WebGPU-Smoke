@@ -122,7 +122,7 @@ export const createVorticityCalculationBindGroupLayout = (
 };
 
 // Layout for vorticityConfinementForce (replaces computeVorticityConfinement)
-export const createVorticityConfinementForceBindGroupLayout = (
+export const createVorticityConfinementBindGroupLayout = (
   device: GPUDevice
 ): GPUBindGroupLayout => {
   return device.createBindGroupLayout({
@@ -130,42 +130,19 @@ export const createVorticityConfinementForceBindGroupLayout = (
     entries: [
       // vorticityConfinementForce_vorticityIn (@binding(0))
       {
-        binding: 0, // Updated binding
+        binding: 0,
         visibility: GPUShaderStage.COMPUTE,
         texture: { sampleType: 'float', viewDimension: '3d' },
       },
-      // vorticityConfinementForce_forceOut (@binding(1))
+      // vorticityConfinementForce_velocityIn (@binding(1))
       {
-        binding: 1, // Updated binding
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
-      },
-    ],
-  });
-};
-
-// Layout for vorticityForceApplication (replaces applyVorticityForce)
-export const createVorticityForceApplicationBindGroupLayout = (
-  device: GPUDevice
-): GPUBindGroupLayout => {
-  return device.createBindGroupLayout({
-    label: 'Vorticity Force Application Bind Group Layout',
-    entries: [
-      // vorticityForceApplication_velocityIn (@binding(0))
-      {
-        binding: 0, // Keep binding
+        binding: 1,
         visibility: GPUShaderStage.COMPUTE,
         texture: { sampleType: 'float', viewDimension: '3d' },
       },
-      // vorticityForceApplication_forceIn (@binding(1))
+      // vorticityConfinementForce_velocityOut (@binding(2))
       {
-        binding: 1, // Updated binding
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float', viewDimension: '3d' },
-      },
-      // vorticityForceApplication_velocityOut (@binding(2))
-      {
-        binding: 2, // Updated binding
+        binding: 2,
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
       },

@@ -1,7 +1,9 @@
 @import "common.wgsl";
 
 @group(1) @binding(0) var vorticityIn: texture_3d<f32>;
-@group(1) @binding(1) var forceOut: texture_storage_3d<rgba16float, write>;
+@group(1) @binding(1) var velocityIn: texture_3d<f32>;
+@group(1) @binding(2) var velocityOut: texture_storage_3d<rgba16float, write>;
+
 
 @compute @workgroup_size(4,4,4)
 fn main(@builtin(global_invocation_id) id : vec3<u32>) {
@@ -31,7 +33,8 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
   }
 
   let vorticity = textureLoad(vorticityIn, id, 0).xyz;
-  let confinement = params.dx * params.vorticityStrength * cross(grad, vorticity);
+  let velocity = textureLoad(velocityIn, id, 0).xyz;
+  let vorticity_conf = params.dx * params.vorticityStrength * cross(grad, vorticity);
 
-  textureStore(forceOut, id, vec4f(confinement, 0.0));
+  textureStore(velocityOut, id, vec4f(velocity + vorticity_conf * params.dt, 0.0));
 } 

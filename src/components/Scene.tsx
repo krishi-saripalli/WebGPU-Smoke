@@ -3,6 +3,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWebGPU, WebGPUState } from '@/hooks/useWebGPU';
 import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderResources';
 import { updateCameraPosition, updateCameraRotation } from '@/utils/camera-movement';
+import { SimulationState } from '@/utils/types';
+import {
+  createUniformBindGroup,
+  createVelocityAdvectionBindGroup,
+  createTemperatureAdvectionBindGroup,
+  createDensityAdvectionBindGroup,
+  createForcesBindGroup,
+  createVorticityCalculationBindGroup,
+  createVorticityConfinementBindGroup,
+  createDivergenceCalculationBindGroup,
+  createPressureIterationBindGroup,
+  createPressureGradientSubtractionBindGroup,
+  createReinitializationBindGroup,
+  createRenderBindGroup,
+} from '@/utils/bind-group';
 import {
   handleKeyDown,
   handleKeyUp,
@@ -11,18 +26,27 @@ import {
   handleMouseUp,
 } from '@/utils/input-handler';
 import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
+import {
+  createDensityAdvectionBindGroupLayout,
+  createDivergenceCalculationBindGroupLayout,
+  createExternalForcesStepBindGroupLayout,
+  createPressureGradientSubtractionBindGroupLayout,
+  createPressureIterationBindGroupLayout,
+  createReinitializationBindGroupLayout,
+  createRenderBindGroupLayout,
+  createTemperatureAdvectionBindGroupLayout,
+  createUniformBindGroupLayout,
+  createVelocityAdvectionBindGroupLayout,
+  createVorticityCalculationBindGroupLayout,
+  createVorticityConfinementBindGroupLayout,
+} from '@/utils/layouts';
 
-const renderScene = (
-  webGPUState: WebGPUState,
-  renderResources: RenderPipelineResources,
-  shouldSwapBindGroups: boolean // If true, first pass reads from B; if false, reads from A
-): boolean => {
-  const { device, context, canvasFormat } = webGPUState;
+const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineResources): void => {
+  const { device, context } = webGPUState;
   const {
     // Render Pipelines,
     slicesPipeline,
     // Compute Pipelines
-    densityCopyPipeline,
     externalForcesStepPipeline,
     vorticityCalculationPipeline,
     vorticityConfinementPipeline,
@@ -38,36 +62,35 @@ const renderScene = (
     slicesIndexBuffer,
     multisampleTexture,
     uniformBuffer,
-    // Uniform Bind Group
-    uniformBindGroup,
-    // Compute Bind Groups
-    externalForcesStepBindGroupA,
-    externalForcesStepBindGroupB,
-    vorticityCalculationBindGroupA,
-    vorticityCalculationBindGroupB,
-    vorticityConfinementBindGroupA,
-    vorticityConfinementBindGroupB,
-    velocityAdvectionBindGroupA,
-    velocityAdvectionBindGroupB,
-    temperatureAdvectionBindGroupA,
-    temperatureAdvectionBindGroupB,
-    densityAdvectionBindGroupA,
-    densityAdvectionBindGroupB,
-    divergenceCalculationBindGroupA,
-    divergenceCalculationBindGroupB,
-    pressureIterationBindGroupA,
-    pressureIterationBindGroupB,
-    pressureGradientSubtractionBindGroupA,
-    pressureGradientSubtractionBindGroupB,
-    reinitializationBindGroupA,
-    reinitializationBindGroupB,
-    // Render Bind Groups
-    renderBindGroupA,
-    renderBindGroupB,
+    simulationParamsBuffer,
+    //Sampler
+    sampler,
+    //Textures
+    densityTextureA,
+    densityTextureB,
+    velocityTextureA,
+    velocityTextureB,
+    temperatureTextureA,
+    temperatureTextureB,
+    pressureTextureA,
+    pressureTextureB,
+    vorticityTextureA,
+    vorticityTextureB,
+    divergenceTextureA,
+    divergenceTextureB,
     // Counts & Sizes
     slicesIndexCount,
     totalGridSize,
   } = renderResources;
+
+  const simulationState: SimulationState = {
+    velocity: { current: velocityTextureA, next: velocityTextureB },
+    density: { current: densityTextureA, next: densityTextureB },
+    temperature: { current: temperatureTextureA, next: temperatureTextureB },
+    pressure: { current: pressureTextureA, next: pressureTextureB },
+    divergence: { current: divergenceTextureA, next: divergenceTextureB },
+    vorticity: { current: vorticityTextureA, next: vorticityTextureB },
+  };
 
   const workgroupSize: [number, number, number] = [4, 4, 4];
   const numWorkgroups: [number, number, number] = [
@@ -79,77 +102,140 @@ const renderScene = (
   //TODO: Different behaviour for even and odd number of iterations?
   const JACOBI_ITERATIONS = 80;
 
-  // initially, shouldSwapBindGroups is false, so  data is in A
-  let dataIsInA = !shouldSwapBindGroups;
-
-  const selectBindGroup = (groupA: GPUBindGroup, groupB: GPUBindGroup) => {
-    return dataIsInA ? groupA : groupB;
+  const swapTextures = (resource: keyof SimulationState) => {
+    const temp = simulationState[resource].current;
+    simulationState[resource].current = simulationState[resource].next;
+    simulationState[resource].next = temp;
   };
 
-  const forcesEncoder = device.createCommandEncoder({ label: 'External Forces Encoder' });
-  const forcesPass = forcesEncoder.beginComputePass({ label: 'External Forces Pass' });
-  forcesPass.setPipeline(externalForcesStepPipeline);
-  forcesPass.setBindGroup(0, uniformBindGroup);
-  forcesPass.setBindGroup(
-    1,
-    selectBindGroup(externalForcesStepBindGroupA, externalForcesStepBindGroupB)
+  const uniformBindGroup = createUniformBindGroup(
+    device,
+    createUniformBindGroupLayout(device),
+    uniformBuffer,
+    simulationParamsBuffer
   );
-  forcesPass.dispatchWorkgroups(...numWorkgroups);
-  forcesPass.end();
-  device.queue.submit([forcesEncoder.finish()]);
-  dataIsInA = !dataIsInA;
-
-  const vorticityEncoder = device.createCommandEncoder({ label: 'Vorticity Calc Encoder' });
-  const vorticityPass = vorticityEncoder.beginComputePass({ label: 'Vorticity Calc Pass' });
-  vorticityPass.setPipeline(vorticityCalculationPipeline);
-  vorticityPass.setBindGroup(0, uniformBindGroup);
-  vorticityPass.setBindGroup(
-    1,
-    selectBindGroup(vorticityCalculationBindGroupA, vorticityCalculationBindGroupB)
-  );
-  vorticityPass.dispatchWorkgroups(...numWorkgroups);
-  vorticityPass.end();
-  device.queue.submit([vorticityEncoder.finish()]);
-
-  const confinementEncoder = device.createCommandEncoder({ label: 'Vorticity Conf Encoder' });
-  const confinementPass = confinementEncoder.beginComputePass({ label: 'Vorticity Conf Pass' });
-  confinementPass.setPipeline(vorticityConfinementPipeline);
-  confinementPass.setBindGroup(0, uniformBindGroup);
-  confinementPass.setBindGroup(
-    1,
-    selectBindGroup(vorticityConfinementBindGroupA, vorticityConfinementBindGroupB)
-  );
-  confinementPass.dispatchWorkgroups(...numWorkgroups);
-  confinementPass.end();
-  device.queue.submit([confinementEncoder.finish()]);
-  dataIsInA = !dataIsInA;
 
   const advectVelEncoder = device.createCommandEncoder({ label: 'Velocity Advect Encoder' });
   const advectVelPass = advectVelEncoder.beginComputePass({ label: 'Velocity Advect Pass' });
   advectVelPass.setPipeline(velocityAdvectionPipeline);
   advectVelPass.setBindGroup(0, uniformBindGroup);
-  advectVelPass.setBindGroup(
-    1,
-    selectBindGroup(velocityAdvectionBindGroupA, velocityAdvectionBindGroupB)
+  const advectVelBindGroup = createVelocityAdvectionBindGroup(
+    device,
+    createVelocityAdvectionBindGroupLayout(device),
+    simulationState.velocity.current,
+    sampler,
+    simulationState.velocity.next
   );
+  advectVelPass.setBindGroup(0, uniformBindGroup);
+  advectVelPass.setBindGroup(1, advectVelBindGroup);
   advectVelPass.dispatchWorkgroups(...numWorkgroups);
   advectVelPass.end();
   device.queue.submit([advectVelEncoder.finish()]);
-  dataIsInA = !dataIsInA;
+  swapTextures('velocity');
+
+  const tempAdvectEncoder = device.createCommandEncoder({ label: 'Temperature Advect Encoder' });
+  const tempAdvectPass = tempAdvectEncoder.beginComputePass({ label: 'Temperature Advect Pass' });
+  tempAdvectPass.setPipeline(temperatureAdvectionPipeline);
+  tempAdvectPass.setBindGroup(0, uniformBindGroup);
+  const tempAdvectBindGroup = createTemperatureAdvectionBindGroup(
+    device,
+    createTemperatureAdvectionBindGroupLayout(device),
+    simulationState.velocity.current,
+    simulationState.temperature.current,
+    sampler,
+    simulationState.temperature.next
+  );
+  tempAdvectPass.setBindGroup(0, uniformBindGroup);
+  tempAdvectPass.setBindGroup(1, tempAdvectBindGroup);
+  tempAdvectPass.dispatchWorkgroups(...numWorkgroups);
+  tempAdvectPass.end();
+  device.queue.submit([tempAdvectEncoder.finish()]);
+  swapTextures('temperature');
+
+  const densityAdvectEncoder = device.createCommandEncoder({ label: 'Density Advect Encoder' });
+  const densityAdvectPass = densityAdvectEncoder.beginComputePass({ label: 'Density Advect Pass' });
+  densityAdvectPass.setPipeline(densityAdvectionPipeline);
+  const densityAdvectBindGroup = createDensityAdvectionBindGroup(
+    device,
+    createDensityAdvectionBindGroupLayout(device),
+    simulationState.velocity.current,
+    simulationState.density.current,
+    sampler,
+    simulationState.density.next
+  );
+  densityAdvectPass.setBindGroup(0, uniformBindGroup);
+  densityAdvectPass.setBindGroup(1, densityAdvectBindGroup);
+  densityAdvectPass.dispatchWorkgroups(...numWorkgroups);
+  densityAdvectPass.end();
+  device.queue.submit([densityAdvectEncoder.finish()]);
+  swapTextures('density');
+
+  const forcesEncoder = device.createCommandEncoder({ label: 'External Forces Encoder' });
+  const forcesPass = forcesEncoder.beginComputePass({ label: 'External Forces Pass' });
+  forcesPass.setPipeline(externalForcesStepPipeline);
+  const forcesBindGroup = createForcesBindGroup(
+    device,
+    createExternalForcesStepBindGroupLayout(device),
+    simulationState.velocity.current,
+    simulationState.temperature.current,
+    simulationState.density.current,
+    simulationState.velocity.next
+  );
+  forcesPass.setBindGroup(0, uniformBindGroup);
+  forcesPass.setBindGroup(1, forcesBindGroup);
+  forcesPass.dispatchWorkgroups(...numWorkgroups);
+  forcesPass.end();
+  device.queue.submit([forcesEncoder.finish()]);
+  swapTextures('velocity');
+
+  const vorticityEncoder = device.createCommandEncoder({ label: 'Vorticity Calc Encoder' });
+  const vorticityPass = vorticityEncoder.beginComputePass({ label: 'Vorticity Calc Pass' });
+  vorticityPass.setPipeline(vorticityCalculationPipeline);
+  const vorticityBindGroup = createVorticityCalculationBindGroup(
+    device,
+    createVorticityCalculationBindGroupLayout(device),
+    simulationState.velocity.current,
+    simulationState.vorticity.next
+  );
+  vorticityPass.setBindGroup(0, uniformBindGroup);
+  vorticityPass.setBindGroup(1, vorticityBindGroup);
+  vorticityPass.dispatchWorkgroups(...numWorkgroups);
+  vorticityPass.end();
+  device.queue.submit([vorticityEncoder.finish()]);
+  swapTextures('vorticity');
+
+  const confinementEncoder = device.createCommandEncoder({ label: 'Vorticity Conf Encoder' });
+  const confinementPass = confinementEncoder.beginComputePass({ label: 'Vorticity Conf Pass' });
+  confinementPass.setPipeline(vorticityConfinementPipeline);
+  const confinementBindGroup = createVorticityConfinementBindGroup(
+    device,
+    createVorticityConfinementBindGroupLayout(device),
+    simulationState.velocity.current,
+    simulationState.vorticity.current,
+    simulationState.velocity.next
+  );
+  confinementPass.setBindGroup(0, uniformBindGroup);
+  confinementPass.setBindGroup(1, confinementBindGroup);
+  confinementPass.dispatchWorkgroups(...numWorkgroups);
+  confinementPass.end();
+  device.queue.submit([confinementEncoder.finish()]);
+  swapTextures('velocity');
 
   const divergenceEncoder = device.createCommandEncoder({ label: 'Divergence Encoder' });
   const divergencePass = divergenceEncoder.beginComputePass({ label: 'Divergence Pass' });
   divergencePass.setPipeline(divergenceCalculationPipeline);
-  divergencePass.setBindGroup(0, uniformBindGroup);
-  divergencePass.setBindGroup(
-    1,
-    selectBindGroup(divergenceCalculationBindGroupA, divergenceCalculationBindGroupB)
+  const divergenceBindGroup = createDivergenceCalculationBindGroup(
+    device,
+    createDivergenceCalculationBindGroupLayout(device),
+    simulationState.velocity.current,
+    simulationState.divergence.next
   );
+  divergencePass.setBindGroup(0, uniformBindGroup);
+  divergencePass.setBindGroup(1, divergenceBindGroup);
   divergencePass.dispatchWorkgroups(...numWorkgroups);
   divergencePass.end();
   device.queue.submit([divergenceEncoder.finish()]);
-
-  let pressureIsInA = !dataIsInA; // initial pressure state is opposite of velocity state
+  swapTextures('divergence');
 
   const pressureEncoder = device.createCommandEncoder({ label: 'Pressure Solve Encoder' });
   const pressurePass = pressureEncoder.beginComputePass({ label: 'Pressure Solve Pass' });
@@ -157,12 +243,16 @@ const renderScene = (
   pressurePass.setBindGroup(0, uniformBindGroup);
 
   for (let i = 0; i < JACOBI_ITERATIONS; i++) {
-    pressurePass.setBindGroup(
-      1,
-      pressureIsInA ? pressureIterationBindGroupA : pressureIterationBindGroupB
+    const pressureBindGroup = createPressureIterationBindGroup(
+      device,
+      createPressureIterationBindGroupLayout(device),
+      simulationState.divergence.current,
+      simulationState.pressure.current,
+      simulationState.pressure.next
     );
+    pressurePass.setBindGroup(1, pressureBindGroup);
     pressurePass.dispatchWorkgroups(...numWorkgroups);
-    pressureIsInA = !pressureIsInA;
+    swapTextures('pressure');
   }
 
   pressurePass.end();
@@ -172,40 +262,18 @@ const renderScene = (
   const pressureGradPass = pressureGradEncoder.beginComputePass({ label: 'Pressure Grad Pass' });
   pressureGradPass.setPipeline(pressureGradientSubtractionPipeline);
   pressureGradPass.setBindGroup(0, uniformBindGroup);
-  pressureGradPass.setBindGroup(
-    1,
-    pressureIsInA ? pressureGradientSubtractionBindGroupA : pressureGradientSubtractionBindGroupB
+  const pressureGradBindGroup = createPressureGradientSubtractionBindGroup(
+    device,
+    createPressureGradientSubtractionBindGroupLayout(device),
+    simulationState.pressure.current,
+    simulationState.velocity.current,
+    simulationState.velocity.next
   );
+  pressureGradPass.setBindGroup(1, pressureGradBindGroup);
   pressureGradPass.dispatchWorkgroups(...numWorkgroups);
   pressureGradPass.end();
   device.queue.submit([pressureGradEncoder.finish()]);
-  dataIsInA = !dataIsInA;
-
-  const tempAdvectEncoder = device.createCommandEncoder({ label: 'Temperature Advect Encoder' });
-  const tempAdvectPass = tempAdvectEncoder.beginComputePass({ label: 'Temperature Advect Pass' });
-  tempAdvectPass.setPipeline(temperatureAdvectionPipeline);
-  tempAdvectPass.setBindGroup(0, uniformBindGroup);
-  tempAdvectPass.setBindGroup(
-    1,
-    selectBindGroup(temperatureAdvectionBindGroupA, temperatureAdvectionBindGroupB)
-  );
-  tempAdvectPass.dispatchWorkgroups(...numWorkgroups);
-  tempAdvectPass.end();
-  device.queue.submit([tempAdvectEncoder.finish()]);
-  dataIsInA = !dataIsInA;
-
-  const densityAdvectEncoder = device.createCommandEncoder({ label: 'Density Advect Encoder' });
-  const densityAdvectPass = densityAdvectEncoder.beginComputePass({ label: 'Density Advect Pass' });
-  densityAdvectPass.setPipeline(densityAdvectionPipeline);
-  densityAdvectPass.setBindGroup(0, uniformBindGroup);
-  densityAdvectPass.setBindGroup(
-    1,
-    selectBindGroup(densityAdvectionBindGroupA, densityAdvectionBindGroupB)
-  );
-  densityAdvectPass.dispatchWorkgroups(...numWorkgroups);
-  densityAdvectPass.end();
-  device.queue.submit([densityAdvectEncoder.finish()]);
-  dataIsInA = !dataIsInA;
+  swapTextures('velocity');
 
   const reinitializationEncoder = device.createCommandEncoder({
     label: 'Reinitialization Encoder',
@@ -215,14 +283,23 @@ const renderScene = (
   });
   reinitializationPass.setPipeline(reinitializationPipeline);
   reinitializationPass.setBindGroup(0, uniformBindGroup);
-  reinitializationPass.setBindGroup(
-    1,
-    selectBindGroup(reinitializationBindGroupA, reinitializationBindGroupB) // overwriting the output of the previous pass
+  const reinitializationBindGroup = createReinitializationBindGroup(
+    device,
+    createReinitializationBindGroupLayout(device),
+    simulationState.temperature.current,
+    simulationState.temperature.next,
+    simulationState.density.current,
+    simulationState.density.next,
+    simulationState.velocity.current,
+    simulationState.velocity.next
   );
+  reinitializationPass.setBindGroup(1, reinitializationBindGroup);
   reinitializationPass.dispatchWorkgroups(...numWorkgroups);
   reinitializationPass.end();
   device.queue.submit([reinitializationEncoder.finish()]);
-  dataIsInA = !dataIsInA;
+  swapTextures('density');
+  swapTextures('velocity');
+  swapTextures('temperature');
 
   /////////////////////////////////////////////////////////////////////////
   // Render pass
@@ -241,28 +318,23 @@ const renderScene = (
   };
   const renderPass = renderEncoder.beginRenderPass(renderPassDescriptor);
 
-  // use final density state for rendering
-  const finalRenderBindGroup = dataIsInA ? renderBindGroupA : renderBindGroupB;
-
-  // TODO: get rid of wireframe
-  // renderPass.setPipeline(wireframePipeline);
   renderPass.setBindGroup(0, uniformBindGroup);
-  // renderPass.setBindGroup(1, finalRenderBindGroup);
-  // renderPass.setVertexBuffer(0, wireframeVertexBuffer);
-  // renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
-  // renderPass.drawIndexed(wireframeIndexCount);
 
   // transparent slices
   renderPass.setPipeline(slicesPipeline);
-  renderPass.setBindGroup(1, finalRenderBindGroup);
+  const renderBindGroup = createRenderBindGroup(
+    device,
+    createRenderBindGroupLayout(device),
+    simulationState.density.current,
+    sampler
+  );
+  renderPass.setBindGroup(1, renderBindGroup);
   renderPass.setVertexBuffer(0, slicesVertexBuffer);
   renderPass.setIndexBuffer(slicesIndexBuffer, 'uint32');
   renderPass.drawIndexed(slicesIndexCount);
 
   renderPass.end();
   device.queue.submit([renderEncoder.finish()]);
-
-  return !dataIsInA;
 };
 
 export const WebGPUCanvas = () => {
@@ -273,7 +345,6 @@ export const WebGPUCanvas = () => {
   const pressedKeysRef = useRef(new Set<string>());
   const [isDragging, setIsDragging] = useState(false);
   const [prevMousePos, setPrevMousePos] = useState<{ x: number; y: number } | null>(null);
-  const shouldSwapBindGroups = useRef(false); // start reading from A
 
   useEffect(() => {
     pressedKeysRef.current = pressedKeys;
@@ -328,8 +399,7 @@ export const WebGPUCanvas = () => {
         forward as Float32Array
       );
 
-      const nextSwapState = renderScene(webGPUState, renderResources, shouldSwapBindGroups.current);
-      shouldSwapBindGroups.current = nextSwapState;
+      renderScene(webGPUState, renderResources);
 
       frameId = requestAnimationFrame(animationLoop);
     }
@@ -383,12 +453,7 @@ export const WebGPUCanvas = () => {
           forward as Float32Array
         );
 
-        const nextSwapState = renderScene(
-          webGPUState,
-          renderResources,
-          shouldSwapBindGroups.current
-        );
-        shouldSwapBindGroups.current = nextSwapState;
+        renderScene(webGPUState, renderResources);
       }
     },
     [isDragging, prevMousePos, renderResources, webGPUState]

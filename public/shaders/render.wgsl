@@ -21,7 +21,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 }
 
 @group(1) @binding(0)
-var densityView: texture_3d<f32>;
+var densityIn: texture_3d<f32>;
 
 @group(1) @binding(1)
 var densitySampler: sampler;
@@ -33,7 +33,7 @@ fn fragmentMain(vertexOut: VertexOutput) -> @location(0) vec4f {
 
 @fragment
 fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
-  let density = textureSample(densityView, densitySampler, vertexOut.texCoord);
+  let density = textureSample(densityIn, densitySampler, vertexOut.texCoord);
   var outer_wall = vec4f(0.0, 0.0, 0.0, 0.0);
   if (vertexOut.texCoord.x == 0.0 || vertexOut.texCoord.x == 1.0 || vertexOut.texCoord.z == 0.0) {
     outer_wall = vec4f(0.1, 0.1, 0.1, 0.0);

@@ -11,7 +11,6 @@ import { SHADER_PATHS, RENDER_ENTRY_POINTS, createComputePipeline } from '@/util
 
 export interface RenderPipelineResources {
   slicesPipeline: GPURenderPipeline;
-  densityCopyPipeline: GPUComputePipeline;
   externalForcesStepPipeline: GPUComputePipeline;
   vorticityCalculationPipeline: GPUComputePipeline;
   vorticityConfinementPipeline: GPUComputePipeline;
@@ -27,36 +26,12 @@ export interface RenderPipelineResources {
   uniformBuffer: GPUBuffer;
   simulationParamsBuffer: GPUBuffer;
   multisampleTexture: GPUTexture;
-  densityCopyBindGroupA: GPUBindGroup;
-  densityCopyBindGroupB: GPUBindGroup;
-  externalForcesStepBindGroupA: GPUBindGroup;
-  externalForcesStepBindGroupB: GPUBindGroup;
-  vorticityCalculationBindGroupA: GPUBindGroup;
-  vorticityCalculationBindGroupB: GPUBindGroup;
-  vorticityConfinementBindGroupA: GPUBindGroup;
-  vorticityConfinementBindGroupB: GPUBindGroup;
-  velocityAdvectionBindGroupA: GPUBindGroup;
-  velocityAdvectionBindGroupB: GPUBindGroup;
-  temperatureAdvectionBindGroupA: GPUBindGroup;
-  temperatureAdvectionBindGroupB: GPUBindGroup;
-  densityAdvectionBindGroupA: GPUBindGroup;
-  densityAdvectionBindGroupB: GPUBindGroup;
-  divergenceCalculationBindGroupA: GPUBindGroup;
-  divergenceCalculationBindGroupB: GPUBindGroup;
-  pressureIterationBindGroupA: GPUBindGroup;
-  pressureIterationBindGroupB: GPUBindGroup;
-  pressureGradientSubtractionBindGroupA: GPUBindGroup;
-  pressureGradientSubtractionBindGroupB: GPUBindGroup;
-  reinitializationBindGroupA: GPUBindGroup;
-  reinitializationBindGroupB: GPUBindGroup;
-  renderBindGroupA: GPUBindGroup;
-  renderBindGroupB: GPUBindGroup;
-  uniformBindGroup: GPUBindGroup;
   slicesIndexCount: number;
   camera: Camera;
   gridSize: number;
   totalGridSize: number;
   halosSize: number;
+  sampler: GPUSampler;
   densityTextureA: GPUTexture;
   densityTextureB: GPUTexture;
   velocityTextureA: GPUTexture;
@@ -388,9 +363,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         );
 
         const uniformBindGroupLayout = layouts.createUniformBindGroupLayout(device);
-
         const renderTexturesBindGroupLayout = layouts.createRenderBindGroupLayout(device);
-
         const densityCopyBindGroupLayout = layouts.createDensityCopyBindGroupLayout(device);
         const externalForcesStepBindGroupLayout =
           layouts.createExternalForcesStepBindGroupLayout(device);
@@ -420,239 +393,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           magFilter: 'linear',
           minFilter: 'linear',
           mipmapFilter: 'nearest',
-        });
-
-        const uniformBindGroup = device.createBindGroup({
-          layout: uniformBindGroupLayout,
-          entries: [
-            {
-              binding: 0,
-              resource: { buffer: uniformBuffer },
-            },
-            {
-              binding: 1,
-              resource: { buffer: simulationParamsBuffer },
-            },
-          ],
-        });
-
-        const densityCopyBindGroupA = device.createBindGroup({
-          layout: densityCopyBindGroupLayout,
-          entries: [
-            { binding: 0, resource: densityTextureA.createView() },
-            { binding: 1, resource: densityTextureB.createView() },
-          ],
-        });
-        const densityCopyBindGroupB = device.createBindGroup({
-          layout: densityCopyBindGroupLayout,
-          entries: [
-            { binding: 0, resource: densityTextureB.createView() },
-            { binding: 1, resource: densityTextureA.createView() },
-          ],
-        });
-
-        const externalForcesStepBindGroupA = device.createBindGroup({
-          layout: externalForcesStepBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureA.createView() },
-            { binding: 1, resource: temperatureTextureA.createView() },
-            { binding: 2, resource: densityTextureA.createView() },
-            { binding: 3, resource: velocityTextureB.createView() },
-          ],
-        });
-        const externalForcesStepBindGroupB = device.createBindGroup({
-          layout: externalForcesStepBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureB.createView() },
-            { binding: 1, resource: temperatureTextureB.createView() },
-            { binding: 2, resource: densityTextureB.createView() },
-            { binding: 3, resource: velocityTextureA.createView() },
-          ],
-        });
-
-        const vorticityCalculationBindGroupA = device.createBindGroup({
-          layout: vorticityCalculationBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureA.createView() },
-            { binding: 1, resource: vorticityTextureB.createView() },
-          ],
-        });
-        const vorticityCalculationBindGroupB = device.createBindGroup({
-          layout: vorticityCalculationBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureB.createView() },
-            { binding: 1, resource: vorticityTextureA.createView() },
-          ],
-        });
-
-        const vorticityConfinementBindGroupA = device.createBindGroup({
-          layout: vorticityConfinementBindGroupLayout,
-          entries: [
-            { binding: 0, resource: vorticityTextureA.createView() },
-            { binding: 1, resource: velocityTextureA.createView() },
-            { binding: 2, resource: velocityTextureB.createView() },
-          ],
-        });
-        const vorticityConfinementBindGroupB = device.createBindGroup({
-          layout: vorticityConfinementBindGroupLayout,
-          entries: [
-            { binding: 0, resource: vorticityTextureB.createView() },
-            { binding: 1, resource: velocityTextureB.createView() },
-            { binding: 2, resource: velocityTextureA.createView() },
-          ],
-        });
-
-        const velocityAdvectionBindGroupA = device.createBindGroup({
-          layout: velocityAdvectionBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureA.createView() },
-            { binding: 1, resource: sampler },
-            { binding: 2, resource: velocityTextureB.createView() },
-          ],
-        });
-        const velocityAdvectionBindGroupB = device.createBindGroup({
-          layout: velocityAdvectionBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureB.createView() },
-            { binding: 1, resource: sampler },
-            { binding: 2, resource: velocityTextureA.createView() },
-          ],
-        });
-
-        const temperatureAdvectionBindGroupA = device.createBindGroup({
-          layout: temperatureAdvectionBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureA.createView() },
-            { binding: 1, resource: temperatureTextureA.createView() },
-            { binding: 2, resource: sampler },
-            { binding: 3, resource: temperatureTextureB.createView() },
-          ],
-        });
-        const temperatureAdvectionBindGroupB = device.createBindGroup({
-          layout: temperatureAdvectionBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureB.createView() },
-            { binding: 1, resource: temperatureTextureB.createView() },
-            { binding: 2, resource: sampler },
-            { binding: 3, resource: temperatureTextureA.createView() },
-          ],
-        });
-
-        const densityAdvectionBindGroupA = device.createBindGroup({
-          layout: densityAdvectionBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureA.createView() },
-            { binding: 1, resource: densityTextureA.createView() },
-            { binding: 2, resource: sampler },
-            { binding: 3, resource: densityTextureB.createView() },
-          ],
-        });
-        const densityAdvectionBindGroupB = device.createBindGroup({
-          layout: densityAdvectionBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureB.createView() },
-            { binding: 1, resource: densityTextureB.createView() },
-            { binding: 2, resource: sampler },
-            { binding: 3, resource: densityTextureA.createView() },
-          ],
-        });
-
-        const divergenceCalculationBindGroupA = device.createBindGroup({
-          layout: divergenceCalculationBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureA.createView() },
-            { binding: 1, resource: divergenceTextureB.createView() },
-          ],
-        });
-        const divergenceCalculationBindGroupB = device.createBindGroup({
-          layout: divergenceCalculationBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureB.createView() },
-            { binding: 1, resource: divergenceTextureA.createView() },
-          ],
-        });
-
-        const pressureIterationBindGroupA = device.createBindGroup({
-          layout: pressureIterationBindGroupLayout,
-          entries: [
-            { binding: 0, resource: pressureTextureA.createView() },
-            { binding: 1, resource: divergenceTextureA.createView() },
-            { binding: 2, resource: pressureTextureB.createView() },
-          ],
-        });
-        const pressureIterationBindGroupB = device.createBindGroup({
-          layout: pressureIterationBindGroupLayout,
-          entries: [
-            { binding: 0, resource: pressureTextureB.createView() },
-            { binding: 1, resource: divergenceTextureB.createView() },
-            { binding: 2, resource: pressureTextureA.createView() },
-          ],
-        });
-
-        const pressureGradientSubtractionBindGroupA = device.createBindGroup({
-          layout: pressureGradientSubtractionBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureA.createView() },
-            { binding: 1, resource: pressureTextureA.createView() },
-            { binding: 2, resource: velocityTextureB.createView() },
-          ],
-        });
-        const pressureGradientSubtractionBindGroupB = device.createBindGroup({
-          layout: pressureGradientSubtractionBindGroupLayout,
-          entries: [
-            { binding: 0, resource: velocityTextureB.createView() },
-            { binding: 1, resource: pressureTextureB.createView() },
-            { binding: 2, resource: velocityTextureA.createView() },
-          ],
-        });
-
-        const reinitializationBindGroupA = device.createBindGroup({
-          layout: reinitializationBindGroupLayout,
-          entries: [
-            { binding: 0, resource: temperatureTextureA.createView() },
-            { binding: 1, resource: temperatureTextureB.createView() },
-            { binding: 2, resource: densityTextureA.createView() },
-            { binding: 3, resource: densityTextureB.createView() },
-            { binding: 4, resource: velocityTextureA.createView() },
-            { binding: 5, resource: velocityTextureB.createView() },
-          ],
-        });
-        const reinitializationBindGroupB = device.createBindGroup({
-          layout: reinitializationBindGroupLayout,
-          entries: [
-            { binding: 0, resource: temperatureTextureB.createView() },
-            { binding: 1, resource: temperatureTextureA.createView() },
-            { binding: 2, resource: densityTextureB.createView() },
-            { binding: 3, resource: densityTextureA.createView() },
-            { binding: 4, resource: velocityTextureB.createView() },
-            { binding: 5, resource: velocityTextureA.createView() },
-          ],
-        });
-        const renderBindGroupA = device.createBindGroup({
-          layout: renderTexturesBindGroupLayout,
-          entries: [
-            {
-              binding: 0,
-              resource: densityTextureA.createView(),
-            },
-            {
-              binding: 1,
-              resource: sampler,
-            },
-          ],
-        });
-        const renderBindGroupB = device.createBindGroup({
-          layout: renderTexturesBindGroupLayout,
-          entries: [
-            {
-              binding: 0,
-              resource: densityTextureB.createView(),
-            },
-            {
-              binding: 1,
-              resource: sampler,
-            },
-          ],
         });
 
         const { vertexPositions: slicesVertexPositions, indicesList: slicesIndicesList } =
@@ -720,20 +460,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
             ],
           },
         });
-
-        const densityCopyPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createDensityCopyBindGroupLayout(device),
-          ],
-        });
-        const densityCopyPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'densityCopy',
-          densityCopyPipelineLayout,
-          'Density Copy'
-        );
 
         const externalForcesStepPipelineLayout = device.createPipelineLayout({
           bindGroupLayouts: [
@@ -888,7 +614,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         setResources({
           slicesPipeline,
-          densityCopyPipeline,
           externalForcesStepPipeline,
           vorticityCalculationPipeline,
           vorticityConfinementPipeline,
@@ -904,36 +629,12 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           uniformBuffer,
           simulationParamsBuffer,
           multisampleTexture,
-          densityCopyBindGroupA,
-          densityCopyBindGroupB,
-          externalForcesStepBindGroupA,
-          externalForcesStepBindGroupB,
-          vorticityCalculationBindGroupA,
-          vorticityCalculationBindGroupB,
-          vorticityConfinementBindGroupA,
-          vorticityConfinementBindGroupB,
-          velocityAdvectionBindGroupA,
-          velocityAdvectionBindGroupB,
-          temperatureAdvectionBindGroupA,
-          temperatureAdvectionBindGroupB,
-          densityAdvectionBindGroupA,
-          densityAdvectionBindGroupB,
-          divergenceCalculationBindGroupA,
-          divergenceCalculationBindGroupB,
-          pressureIterationBindGroupA,
-          pressureIterationBindGroupB,
-          pressureGradientSubtractionBindGroupA,
-          pressureGradientSubtractionBindGroupB,
-          reinitializationBindGroupA,
-          reinitializationBindGroupB,
-          renderBindGroupA,
-          renderBindGroupB,
-          uniformBindGroup,
           slicesIndexCount: slicesIndices.length,
           camera,
           gridSize: internalGridSize,
           totalGridSize,
           halosSize,
+          sampler,
           densityTextureA,
           densityTextureB,
           velocityTextureA,

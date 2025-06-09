@@ -28,7 +28,8 @@ var densitySampler: sampler;
 
 @fragment
 fn fragmentMain(vertexOut: VertexOutput) -> @location(0) vec4f {
-  return vec4f(1.0, 1.0, 1.0, 1.0);
+  //beige
+  return vec4f(0.6, 0.56, 0.91, 0.0);
 }
 
 @fragment

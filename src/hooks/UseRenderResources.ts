@@ -65,7 +65,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         const shaderModules = await loadShaderModules(device, SHADER_PATHS);
 
-        const gridSize = 50;
+        const gridSize = 100;
 
         const shaderDefs = makeShaderDataDefinitions(commonShaderCode);
 
@@ -109,9 +109,9 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         simulationParamsView.set({
           dt: 0.01,
           dx: 1.0 / internalGridSize,
-          vorticityStrength: 1.0,
-          buoyancyAlpha: 12.0,
-          buoyancyBeta: 18.0,
+          vorticityStrength: 7.0,
+          buoyancyAlpha: 10.0,
+          buoyancyBeta: 15.0,
           ambientTemperature: 1.0,
         });
 

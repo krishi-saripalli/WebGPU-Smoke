@@ -100,7 +100,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   ];
 
   //TODO: Different behaviour for even and odd number of iterations?
-  const JACOBI_ITERATIONS = 80;
+  const JACOBI_ITERATIONS = 120;
 
   const swapTextures = (resource: keyof SimulationState) => {
     const temp = simulationState[resource].current;

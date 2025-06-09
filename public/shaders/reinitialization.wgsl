@@ -20,43 +20,69 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
     var velocity = textureLoad(velocityIn, id, 0).xyz;
 
     if (is_halo_cell) {
+        let interior_neighbor_coord = vec3<u32>(
+              clamp(id.x, HALO_SIZE, uniforms.gridSize.x + HALO_SIZE - 1u),
+              clamp(id.y, HALO_SIZE, uniforms.gridSize.y + HALO_SIZE - 1u),
+              clamp(id.z, HALO_SIZE, uniforms.gridSize.z + HALO_SIZE - 1u)
+          );
+        velocity = textureLoad(velocityIn, interior_neighbor_coord, 0).xyz;
+       
+        let top_bottom = id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE;
+        let left_right = id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE;
+        let front_back = id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE;
+        var boundary_mask: u32 = 0u;
+        if (top_bottom) { boundary_mask = boundary_mask | 1u; }
+        if (left_right) { boundary_mask = boundary_mask | 2u; }
+        if (front_back) { boundary_mask = boundary_mask | 4u; }
 
-        if (id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE) { // Bottom or Top
-            velocity.y = 0.0;
+        switch (boundary_mask) {
+            case 1u: { 
+                velocity.y = 0.0;
+                break;
+            }
+            case 2u: {
+                velocity.x = 0.0;
+                break;
+            }
+            case 4u: { 
+                velocity.z = 0.0;
+                break;
+            }
+            default: {
+                break;
+            }
         }
-        if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE) { // Left or Right
-            velocity.x = 0.0;
-        }
-        if (id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) { // Front or Back
-            velocity.z = 0.0;
-        }
-        temperature = 0.0;
-        density = 0.0;
     }
+    
+    else {
+      let internalX = id.x - HALO_SIZE;
+      let internalY = id.y - HALO_SIZE;
+      let internalZ = id.z - HALO_SIZE;
 
-    let centerX = (uniforms.gridSize.x + 2*HALO_SIZE) / 2 ;
-    let centerZ = (uniforms.gridSize.z + 2*HALO_SIZE) / 2;
-    let radius = 3u;
-    let heatHeight = uniforms.gridSize.y / 2; 
-    let densityHeight = 3u;        
+      let source_centerX = uniforms.gridSize.x / 2;
+      let source_centerZ = uniforms.gridSize.z / 2;
+      let radius = 3u;
+      let heatHeight = uniforms.gridSize.y / 2; 
+      let densityHeight = 3u;        
 
-    if (
-      id.y <= heatHeight && 
-      id.y >= HALO_SIZE &&
-      id.x >= centerX - radius &&
-      id.x <= centerX + radius &&
-      id.z >= centerZ - radius &&
-      id.z <= centerZ + radius
-    ) {
-      temperature = params.ambientTemperature + 100.0;
+      if (
+        internalY <= heatHeight &&
+        internalX >= source_centerX - radius &&
+        internalX <= source_centerX + radius &&
+        internalZ >= source_centerZ - radius &&
+        internalZ <= source_centerZ + radius
+      ) {
+        temperature = params.ambientTemperature + 100.0;
 
-      if (id.y <= densityHeight) { 
-        density = 0.5;
+        if (internalY <= densityHeight) { 
+          density = 0.4;
+        }
       }
     }
-    textureStore(temperatureOut, id, vec4f(temperature, 0.0, 0.0, 0.0));
-    textureStore(densityOut, id, vec4f(density, 0.0, 0.0, 0.0));
-    textureStore(velocityOut, id, vec4f(velocity, 0.0));
+
+    textureStore(temperatureOut, id, vec4f(temperature , 0.0, 0.0, 0.0));
+    textureStore(densityOut, id, vec4f(density , 0.0, 0.0, 0.0));
+    textureStore(velocityOut, id, vec4f(velocity , 0.0));
 }
 
    

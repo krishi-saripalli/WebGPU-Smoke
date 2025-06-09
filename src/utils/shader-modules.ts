@@ -66,13 +66,13 @@ export const RENDER_ENTRY_POINTS = {
     module: 'render',
     entryPoint: 'vertexMain',
   },
-  fragment: {
-    module: 'render',
-    entryPoint: 'fragmentMain',
-  },
   fragmentSlices: {
     module: 'render',
     entryPoint: 'fragmentSlices',
+  },
+  fragmentWireframe: {
+    module: 'render',
+    entryPoint: 'fragmentWireframe',
   },
 };
 

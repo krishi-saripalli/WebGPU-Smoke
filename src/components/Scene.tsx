@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWebGPU, WebGPUState } from '@/hooks/useWebGPU';
 import { useRenderResources, RenderPipelineResources } from '@/hooks/UseRenderResources';
-import { updateCameraPosition, updateCameraRotation } from '@/utils/camera-movement';
+import { updateCameraPosition, updateCameraRotation } from '@/utils/camera';
 import { SimulationState } from '@/utils/types';
 import {
   createUniformBindGroup,
@@ -46,6 +46,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   const {
     // Render Pipelines,
     slicesPipeline,
+    wireframePipeline,
     // Compute Pipelines
     externalForcesStepPipeline,
     vorticityCalculationPipeline,
@@ -60,6 +61,9 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
     // Buffers
     slicesVertexBuffer,
     slicesIndexBuffer,
+    wireframeVertexBuffer,
+    wireframeIndexBuffer,
+    wireframeIndexCount,
     multisampleTexture,
     uniformBuffer,
     simulationParamsBuffer,
@@ -332,6 +336,13 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   renderPass.setVertexBuffer(0, slicesVertexBuffer);
   renderPass.setIndexBuffer(slicesIndexBuffer, 'uint32');
   renderPass.drawIndexed(slicesIndexCount);
+
+  // wireframe
+  renderPass.setPipeline(wireframePipeline);
+  renderPass.setBindGroup(0, uniformBindGroup);
+  renderPass.setVertexBuffer(0, wireframeVertexBuffer);
+  renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
+  renderPass.drawIndexed(wireframeIndexCount);
 
   renderPass.end();
   device.queue.submit([renderEncoder.finish()]);

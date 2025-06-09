@@ -27,9 +27,8 @@ var densityIn: texture_3d<f32>;
 var densitySampler: sampler;
 
 @fragment
-fn fragmentMain(vertexOut: VertexOutput) -> @location(0) vec4f {
-  //beige
-  return vec4f(0.6, 0.56, 0.91, 0.0);
+fn fragmentWireframe(vertexOut: VertexOutput) -> @location(0) vec4f {
+  return vec4f(1.0, 1.0, 1.0, 1.0); 
 }
 
 @fragment
@@ -40,5 +39,5 @@ fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
     outer_wall = vec4f(0.1, 0.1, 0.1, 0.0);
   }
   let grey = vec4f(0.7,0.7,0.7,1.0);
-  return vec4f(density.x * grey.x, density.x * grey.y, density.x * grey.z, density.x) + outer_wall; // premultiplied alpha.
+  return vec4f(density.x * grey.x, density.x * grey.y, density.x * grey.z, density.x); // premultiplied alpha.
 } 

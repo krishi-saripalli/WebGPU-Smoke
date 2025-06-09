@@ -3,7 +3,7 @@ import { WebGPUState } from './useWebGPU';
 import { Camera } from '@/modules/Camera';
 import { Vec3 } from 'gl-matrix';
 import { loadShader, loadShaderModules } from '@/utils/shader-loader';
-import { generateSlices } from '@/utils/generate-slices';
+import { generateSlices, generateWireframe } from '@/utils/geometry';
 import { initializeSimulationData } from '@/utils/initializion';
 import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
 import * as layouts from '@/utils/layouts';
@@ -11,6 +11,7 @@ import { SHADER_PATHS, RENDER_ENTRY_POINTS, createComputePipeline } from '@/util
 
 export interface RenderPipelineResources {
   slicesPipeline: GPURenderPipeline;
+  wireframePipeline: GPURenderPipeline;
   externalForcesStepPipeline: GPUComputePipeline;
   vorticityCalculationPipeline: GPUComputePipeline;
   vorticityConfinementPipeline: GPUComputePipeline;
@@ -23,10 +24,13 @@ export interface RenderPipelineResources {
   reinitializationPipeline: GPUComputePipeline;
   slicesVertexBuffer: GPUBuffer;
   slicesIndexBuffer: GPUBuffer;
+  wireframeVertexBuffer: GPUBuffer;
+  wireframeIndexBuffer: GPUBuffer;
   uniformBuffer: GPUBuffer;
   simulationParamsBuffer: GPUBuffer;
   multisampleTexture: GPUTexture;
   slicesIndexCount: number;
+  wireframeIndexCount: number;
   camera: Camera;
   gridSize: number;
   totalGridSize: number;
@@ -81,7 +85,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         });
 
         const camera = new Camera({
-          position: new Vec3([0, 0, 2]),
+          position: new Vec3([0, 0, 2.5]),
           forward: new Vec3([0, 0, -1]),
           up: new Vec3([0, 1, 0]),
           heightAngle: Math.PI / 2,
@@ -110,7 +114,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           dt: 0.01,
           dx: 1.0 / internalGridSize,
           vorticityStrength: 7.0,
-          buoyancyAlpha: 10.0,
+          buoyancyAlpha: 100.0,
           buoyancyBeta: 15.0,
           ambientTemperature: 1.0,
         });
@@ -364,27 +368,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         const uniformBindGroupLayout = layouts.createUniformBindGroupLayout(device);
         const renderTexturesBindGroupLayout = layouts.createRenderBindGroupLayout(device);
-        const densityCopyBindGroupLayout = layouts.createDensityCopyBindGroupLayout(device);
-        const externalForcesStepBindGroupLayout =
-          layouts.createExternalForcesStepBindGroupLayout(device);
-        const vorticityCalculationBindGroupLayout =
-          layouts.createVorticityCalculationBindGroupLayout(device);
-        const vorticityConfinementBindGroupLayout =
-          layouts.createVorticityConfinementBindGroupLayout(device);
-        const velocityAdvectionBindGroupLayout =
-          layouts.createVelocityAdvectionBindGroupLayout(device);
-        const temperatureAdvectionBindGroupLayout =
-          layouts.createTemperatureAdvectionBindGroupLayout(device);
-        const densityAdvectionBindGroupLayout =
-          layouts.createDensityAdvectionBindGroupLayout(device);
-        const divergenceCalculationBindGroupLayout =
-          layouts.createDivergenceCalculationBindGroupLayout(device);
-        const pressureIterationBindGroupLayout =
-          layouts.createPressureIterationBindGroupLayout(device);
-        const pressureGradientSubtractionBindGroupLayout =
-          layouts.createPressureGradientSubtractionBindGroupLayout(device);
-        const reinitializationBindGroupLayout =
-          layouts.createReinitializationBindGroupLayout(device);
 
         const sampler = device.createSampler({
           addressModeU: 'clamp-to-edge',
@@ -413,6 +396,23 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         });
         device.queue.writeBuffer(slicesIndexBuffer, 0, slicesIndices);
 
+        const { vertexPositions: wireframeVertexPositions, indicesList: wireframeIndicesList } =
+          generateWireframe();
+
+        const wireframeVertices = new Float32Array(wireframeVertexPositions);
+        const wireframeIndices = new Uint32Array(wireframeIndicesList);
+
+        const wireframeVertexBuffer = device.createBuffer({
+          size: wireframeVertices.byteLength,
+          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(wireframeVertexBuffer, 0, wireframeVertices);
+
+        const wireframeIndexBuffer = device.createBuffer({
+          size: wireframeIndices.byteLength,
+          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(wireframeIndexBuffer, 0, wireframeIndices);
         let shaderModule: GPUShaderModule;
         try {
           shaderModule = device.createShaderModule({ code: commonShaderCode });
@@ -456,6 +456,22 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
                   color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
                   alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
                 },
+              },
+            ],
+          },
+        });
+
+        const wireframePipeline = device.createRenderPipeline({
+          ...baseRenderPipelineDescriptor,
+          label: 'Wireframe Rendering',
+          primitive: { topology: 'line-list' }, // This is the key change!
+          fragment: {
+            module: shaderModules[RENDER_ENTRY_POINTS.fragmentWireframe.module],
+            entryPoint: RENDER_ENTRY_POINTS.fragmentWireframe.entryPoint,
+            targets: [
+              {
+                format: canvasFormat,
+                // No blending for wireframe - it should be opaque
               },
             ],
           },
@@ -614,6 +630,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
 
         setResources({
           slicesPipeline,
+          wireframePipeline,
           externalForcesStepPipeline,
           vorticityCalculationPipeline,
           vorticityConfinementPipeline,
@@ -627,6 +644,9 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           slicesVertexBuffer,
           slicesIndexBuffer,
           uniformBuffer,
+          wireframeVertexBuffer,
+          wireframeIndexBuffer,
+          wireframeIndexCount: wireframeIndices.length,
           simulationParamsBuffer,
           multisampleTexture,
           slicesIndexCount: slicesIndices.length,

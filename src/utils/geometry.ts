@@ -2,10 +2,6 @@ export function generateSlices(gridSize: number) {
   /////////////////////////////////////////////////////////////////////////
   // Evenly space the points from -1 to +1 in (gridSize) steps
   /////////////////////////////////////////////////////////////////////////
-  const positions: number[] = [];
-  for (let idx = 0; idx < gridSize + 1; idx++) {
-    positions.push(-1.0 + idx * (2.0 / gridSize));
-  }
 
   const vertexPositions: number[] = [];
   const indicesList: number[] = [];
@@ -41,13 +37,53 @@ export function generateSlices(gridSize: number) {
     const z = -1.0 + idx * (2.0 / gridSize);
     addQuad([-1, -1, z], [1, -1, z], [-1, 1, z], [1, 1, z]);
   }
-  //TODO: Add the other axis-aligned slices to support camera movement
+  //TODO: Add the dynamic axis-aligned slices to support camera movement
 
-  // add a left and right boundary quad
-  const left_x = -1;
-  const right_x = 1;
-  addQuad([left_x, -1, -1], [left_x, 1, -1], [left_x, -1, 1], [left_x, 1, 1]);
-  addQuad([right_x, -1, -1], [right_x, 1, -1], [right_x, -1, 1], [right_x, 1, 1]);
+  return { vertexPositions, indicesList };
+}
+
+export function generateWireframe() {
+  const vertexPositions: number[] = [];
+  const indicesList: number[] = [];
+
+  // 8 vertices of a cube
+  const vertices = [
+    [-1, -1, -1],
+    [1, -1, -1],
+    [1, 1, -1],
+    [-1, 1, -1], // back face
+    [-1, -1, 1],
+    [1, -1, 1],
+    [1, 1, 1],
+    [-1, 1, 1], // front face
+  ];
+
+  for (const vertex of vertices) {
+    vertexPositions.push(...vertex);
+  }
+
+  // 12 edges of the cube
+  const edges = [
+    // Back face edges
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 0],
+    // Front face edges
+    [4, 5],
+    [5, 6],
+    [6, 7],
+    [7, 4],
+    // Connecting edges
+    [0, 4],
+    [1, 5],
+    [2, 6],
+    [3, 7],
+  ];
+
+  for (const [start, end] of edges) {
+    indicesList.push(start, end);
+  }
 
   return { vertexPositions, indicesList };
 }

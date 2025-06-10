@@ -314,7 +314,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
       {
         view: multisampleTexture.createView(),
         resolveTarget: context.getCurrentTexture().createView(),
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        clearValue: { r: 0.3085, g: 0.2031, b: 0.0234, a: 1 }, //dark brown
         loadOp: 'clear',
         storeOp: 'store',
       },

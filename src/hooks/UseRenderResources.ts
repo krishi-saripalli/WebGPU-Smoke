@@ -85,8 +85,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         });
 
         const camera = new Camera({
-          position: new Vec3([0, 0, 2.5]),
-          forward: new Vec3([0, 0, -1]),
+          position: new Vec3([-1.5, 0, 2.5]),
+          forward: new Vec3([1, 0, -1]),
           up: new Vec3([0, 1, 0]),
           heightAngle: Math.PI / 2,
           near: 0.1,

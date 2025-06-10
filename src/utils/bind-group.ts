@@ -12,57 +12,28 @@ export function createUniformBindGroup(
     ],
   });
 }
-export function createVelocityAdvectionBindGroup(
-  device: GPUDevice,
-  layout: GPUBindGroupLayout,
-  velocityIn: GPUTexture,
-  sampler: GPUSampler,
-  velocityOut: GPUTexture
-): GPUBindGroup {
-  return device.createBindGroup({
-    layout,
-    entries: [
-      { binding: 0, resource: velocityIn.createView() },
-      { binding: 1, resource: sampler },
-      { binding: 2, resource: velocityOut.createView() },
-    ],
-  });
-}
 
-export function createTemperatureAdvectionBindGroup(
+export function createAdvectionBindGroup(
   device: GPUDevice,
   layout: GPUBindGroupLayout,
   velocityIn: GPUTexture,
+  densityIn: GPUTexture,
   temperatureIn: GPUTexture,
   sampler: GPUSampler,
+  velocityOut: GPUTexture,
+  densityOut: GPUTexture,
   temperatureOut: GPUTexture
 ): GPUBindGroup {
   return device.createBindGroup({
     layout,
     entries: [
       { binding: 0, resource: velocityIn.createView() },
-      { binding: 1, resource: temperatureIn.createView() },
-      { binding: 2, resource: sampler },
-      { binding: 3, resource: temperatureOut.createView() },
-    ],
-  });
-}
-
-export function createDensityAdvectionBindGroup(
-  device: GPUDevice,
-  layout: GPUBindGroupLayout,
-  velocityIn: GPUTexture,
-  densityIn: GPUTexture,
-  sampler: GPUSampler,
-  densityOut: GPUTexture
-): GPUBindGroup {
-  return device.createBindGroup({
-    layout,
-    entries: [
-      { binding: 0, resource: velocityIn.createView() },
       { binding: 1, resource: densityIn.createView() },
-      { binding: 2, resource: sampler },
-      { binding: 3, resource: densityOut.createView() },
+      { binding: 2, resource: temperatureIn.createView() },
+      { binding: 3, resource: sampler },
+      { binding: 4, resource: velocityOut.createView() },
+      { binding: 5, resource: densityOut.createView() },
+      { binding: 6, resource: temperatureOut.createView() },
     ],
   });
 }

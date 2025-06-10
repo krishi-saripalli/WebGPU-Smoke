@@ -15,9 +15,7 @@ export interface RenderPipelineResources {
   externalForcesStepPipeline: GPUComputePipeline;
   vorticityCalculationPipeline: GPUComputePipeline;
   vorticityConfinementPipeline: GPUComputePipeline;
-  velocityAdvectionPipeline: GPUComputePipeline;
-  temperatureAdvectionPipeline: GPUComputePipeline;
-  densityAdvectionPipeline: GPUComputePipeline;
+  advectionPipeline: GPUComputePipeline;
   divergenceCalculationPipeline: GPUComputePipeline;
   pressureIterationPipeline: GPUComputePipeline;
   pressureGradientSubtractionPipeline: GPUComputePipeline;
@@ -519,46 +517,18 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           'Vorticity Confinement'
         );
 
-        const velocityAdvectionPipelineLayout = device.createPipelineLayout({
+        const advectionPipelineLayout = device.createPipelineLayout({
           bindGroupLayouts: [
             uniformBindGroupLayout,
-            layouts.createVelocityAdvectionBindGroupLayout(device),
+            layouts.createAdvectionBindGroupLayout(device),
           ],
         });
-        const velocityAdvectionPipeline = createComputePipeline(
+        const advectionPipeline = createComputePipeline(
           device,
           shaderModules,
-          'velocityAdvection',
-          velocityAdvectionPipelineLayout,
-          'Velocity Advection'
-        );
-
-        const temperatureAdvectionPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createTemperatureAdvectionBindGroupLayout(device),
-          ],
-        });
-        const temperatureAdvectionPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'temperatureAdvection',
-          temperatureAdvectionPipelineLayout,
-          'Temperature Advection'
-        );
-
-        const densityAdvectionPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createDensityAdvectionBindGroupLayout(device),
-          ],
-        });
-        const densityAdvectionPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'densityAdvection',
-          densityAdvectionPipelineLayout,
-          'Density Advection'
+          'advection',
+          advectionPipelineLayout,
+          'Advection'
         );
 
         const divergenceCalculationPipelineLayout = device.createPipelineLayout({
@@ -634,9 +604,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           externalForcesStepPipeline,
           vorticityCalculationPipeline,
           vorticityConfinementPipeline,
-          velocityAdvectionPipeline,
-          temperatureAdvectionPipeline,
-          densityAdvectionPipeline,
+          advectionPipeline,
           divergenceCalculationPipeline,
           pressureIterationPipeline,
           pressureGradientSubtractionPipeline,

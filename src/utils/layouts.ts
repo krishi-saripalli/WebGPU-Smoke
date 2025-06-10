@@ -1,4 +1,4 @@
-// This file contains bind group layouts for rendering and compute operations
+// bind group layouts for rendering and compute operations
 
 // ----- UNIFORM BIND GROUP LAYOUT -----
 export const createUniformBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
@@ -150,93 +150,49 @@ export const createVorticityConfinementBindGroupLayout = (
   });
 };
 
-export const createVelocityAdvectionBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
+export const createAdvectionBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
   return device.createBindGroupLayout({
-    label: 'Velocity Advection Bind Group Layout',
+    label: 'Advection Bind Group Layout',
     entries: [
-      // velocityAdvection_velocityIn (@binding(0)) - For sampling coord
+      // advection_velocityIn (@binding(0))
       {
-        binding: 0, // Keep binding
+        binding: 0,
         visibility: GPUShaderStage.COMPUTE,
         texture: { sampleType: 'float', viewDimension: '3d' },
       },
-      // velocityAdvection_sampler (@binding(1))
+      // advection_densityIn (@binding(1))
       {
-        binding: 1, // Keep binding
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float', viewDimension: '3d' },
+      },
+      // advection_temperatureIn (@binding(2))
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float', viewDimension: '3d' },
+      },
+      // sampler (@binding(3))
+      {
+        binding: 3,
         visibility: GPUShaderStage.COMPUTE,
         sampler: { type: 'filtering' },
       },
-      // velocityAdvection_velocityOut (@binding(3)) - Output
+      // advection_velocityOut (@binding(4))
       {
-        binding: 2, // Updated binding
+        binding: 4,
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
       },
-    ],
-  });
-};
-
-// Layout for temperatureAdvection (replaces advectTemperature)
-export const createTemperatureAdvectionBindGroupLayout = (
-  device: GPUDevice
-): GPUBindGroupLayout => {
-  return device.createBindGroupLayout({
-    label: 'Temperature Advection Bind Group Layout',
-    entries: [
-      // temperatureAdvection_velocityIn (@binding(0))
+      // advection_densityOut (@binding(5))
       {
-        binding: 0, // Keep binding
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float', viewDimension: '3d' },
-      },
-      // temperatureAdvection_temperatureIn (@binding(1))
-      {
-        binding: 1, // Keep binding
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float', viewDimension: '3d' },
-      },
-      // temperatureAdvection_sampler (@binding(2))
-      {
-        binding: 2, // Keep binding
-        visibility: GPUShaderStage.COMPUTE,
-        sampler: { type: 'filtering' },
-      },
-      // temperatureAdvection_temperatureOut (@binding(3))
-      {
-        binding: 3, // Keep binding
+        binding: 5,
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
       },
-    ],
-  });
-};
-
-// Layout for densityAdvection (replaces advectDensity)
-export const createDensityAdvectionBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
-  return device.createBindGroupLayout({
-    label: 'Density Advection Bind Group Layout',
-    entries: [
-      // densityAdvection_velocityIn (@binding(0))
+      // advection_temperatureOut (@binding(6))
       {
-        binding: 0, // Keep binding
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float', viewDimension: '3d' },
-      },
-      // densityAdvection_densityIn (@binding(1))
-      {
-        binding: 1, // Keep binding
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float', viewDimension: '3d' },
-      },
-      // densityAdvection_sampler (@binding(2))
-      {
-        binding: 2, // Keep binding
-        visibility: GPUShaderStage.COMPUTE,
-        sampler: { type: 'filtering' },
-      },
-      // densityAdvection_densityOut (@binding(3))
-      {
-        binding: 3, // Keep binding
+        binding: 6,
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
       },

@@ -1,13 +1,10 @@
 export const SHADER_PATHS = {
   common: '/shaders/common.wgsl',
   render: '/shaders/render.wgsl',
-  density: '/shaders/density.wgsl',
   forces: '/shaders/forces.wgsl',
+  advection: '/shaders/advection.wgsl',
   vorticity: '/shaders/vorticity.wgsl',
   vorticityConfinement: '/shaders/vorticity_confinement.wgsl',
-  velocityAdvection: '/shaders/advect_velocity.wgsl',
-  temperatureAdvection: '/shaders/advect_temperature.wgsl',
-  densityAdvection: '/shaders/advect_density.wgsl',
   divergence: '/shaders/divergence.wgsl',
   pressure: '/shaders/pressure.wgsl',
   pressureGradient: '/shaders/pressure_gradient.wgsl',
@@ -15,8 +12,8 @@ export const SHADER_PATHS = {
 };
 
 export const COMPUTE_ENTRY_POINTS = {
-  densityCopy: {
-    module: 'density',
+  advection: {
+    module: 'advection',
     entryPoint: 'main',
   },
   externalForcesStep: {
@@ -29,18 +26,6 @@ export const COMPUTE_ENTRY_POINTS = {
   },
   vorticityConfinement: {
     module: 'vorticityConfinement',
-    entryPoint: 'main',
-  },
-  velocityAdvection: {
-    module: 'velocityAdvection',
-    entryPoint: 'main',
-  },
-  temperatureAdvection: {
-    module: 'temperatureAdvection',
-    entryPoint: 'main',
-  },
-  densityAdvection: {
-    module: 'densityAdvection',
     entryPoint: 'main',
   },
   divergenceCalculation: {

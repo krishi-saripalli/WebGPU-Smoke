@@ -6,9 +6,6 @@ import { updateCameraPosition, updateCameraRotation } from '@/utils/camera';
 import { SimulationState } from '@/utils/types';
 import {
   createUniformBindGroup,
-  createVelocityAdvectionBindGroup,
-  createTemperatureAdvectionBindGroup,
-  createDensityAdvectionBindGroup,
   createForcesBindGroup,
   createVorticityCalculationBindGroup,
   createVorticityConfinementBindGroup,
@@ -17,6 +14,7 @@ import {
   createPressureGradientSubtractionBindGroup,
   createReinitializationBindGroup,
   createRenderBindGroup,
+  createAdvectionBindGroup,
 } from '@/utils/bind-group';
 import {
   handleKeyDown,
@@ -27,18 +25,16 @@ import {
 } from '@/utils/input-handler';
 import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
 import {
-  createDensityAdvectionBindGroupLayout,
   createDivergenceCalculationBindGroupLayout,
   createExternalForcesStepBindGroupLayout,
   createPressureGradientSubtractionBindGroupLayout,
   createPressureIterationBindGroupLayout,
   createReinitializationBindGroupLayout,
   createRenderBindGroupLayout,
-  createTemperatureAdvectionBindGroupLayout,
   createUniformBindGroupLayout,
-  createVelocityAdvectionBindGroupLayout,
   createVorticityCalculationBindGroupLayout,
   createVorticityConfinementBindGroupLayout,
+  createAdvectionBindGroupLayout,
 } from '@/utils/layouts';
 
 const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineResources): void => {
@@ -51,9 +47,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
     externalForcesStepPipeline,
     vorticityCalculationPipeline,
     vorticityConfinementPipeline,
-    velocityAdvectionPipeline,
-    temperatureAdvectionPipeline,
-    densityAdvectionPipeline,
+    advectionPipeline,
     divergenceCalculationPipeline,
     pressureIterationPipeline,
     pressureGradientSubtractionPipeline,
@@ -119,60 +113,28 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
     simulationParamsBuffer
   );
 
-  const advectVelEncoder = device.createCommandEncoder({ label: 'Velocity Advect Encoder' });
-  const advectVelPass = advectVelEncoder.beginComputePass({ label: 'Velocity Advect Pass' });
-  advectVelPass.setPipeline(velocityAdvectionPipeline);
-  advectVelPass.setBindGroup(0, uniformBindGroup);
-  const advectVelBindGroup = createVelocityAdvectionBindGroup(
+  const advectEncoder = device.createCommandEncoder({ label: 'Advect Encoder' });
+  const advectPass = advectEncoder.beginComputePass({ label: 'Advect Pass' });
+  advectPass.setPipeline(advectionPipeline);
+  const advectBindGroup = createAdvectionBindGroup(
     device,
-    createVelocityAdvectionBindGroupLayout(device),
-    simulationState.velocity.current,
-    sampler,
-    simulationState.velocity.next
-  );
-  advectVelPass.setBindGroup(0, uniformBindGroup);
-  advectVelPass.setBindGroup(1, advectVelBindGroup);
-  advectVelPass.dispatchWorkgroups(...numWorkgroups);
-  advectVelPass.end();
-  device.queue.submit([advectVelEncoder.finish()]);
-  swapTextures('velocity');
-
-  const tempAdvectEncoder = device.createCommandEncoder({ label: 'Temperature Advect Encoder' });
-  const tempAdvectPass = tempAdvectEncoder.beginComputePass({ label: 'Temperature Advect Pass' });
-  tempAdvectPass.setPipeline(temperatureAdvectionPipeline);
-  tempAdvectPass.setBindGroup(0, uniformBindGroup);
-  const tempAdvectBindGroup = createTemperatureAdvectionBindGroup(
-    device,
-    createTemperatureAdvectionBindGroupLayout(device),
-    simulationState.velocity.current,
-    simulationState.temperature.current,
-    sampler,
-    simulationState.temperature.next
-  );
-  tempAdvectPass.setBindGroup(0, uniformBindGroup);
-  tempAdvectPass.setBindGroup(1, tempAdvectBindGroup);
-  tempAdvectPass.dispatchWorkgroups(...numWorkgroups);
-  tempAdvectPass.end();
-  device.queue.submit([tempAdvectEncoder.finish()]);
-  swapTextures('temperature');
-
-  const densityAdvectEncoder = device.createCommandEncoder({ label: 'Density Advect Encoder' });
-  const densityAdvectPass = densityAdvectEncoder.beginComputePass({ label: 'Density Advect Pass' });
-  densityAdvectPass.setPipeline(densityAdvectionPipeline);
-  const densityAdvectBindGroup = createDensityAdvectionBindGroup(
-    device,
-    createDensityAdvectionBindGroupLayout(device),
+    createAdvectionBindGroupLayout(device),
     simulationState.velocity.current,
     simulationState.density.current,
+    simulationState.temperature.current,
     sampler,
-    simulationState.density.next
+    simulationState.velocity.next,
+    simulationState.density.next,
+    simulationState.temperature.next
   );
-  densityAdvectPass.setBindGroup(0, uniformBindGroup);
-  densityAdvectPass.setBindGroup(1, densityAdvectBindGroup);
-  densityAdvectPass.dispatchWorkgroups(...numWorkgroups);
-  densityAdvectPass.end();
-  device.queue.submit([densityAdvectEncoder.finish()]);
+  advectPass.setBindGroup(0, uniformBindGroup);
+  advectPass.setBindGroup(1, advectBindGroup);
+  advectPass.dispatchWorkgroups(...numWorkgroups);
+  advectPass.end();
+  device.queue.submit([advectEncoder.finish()]);
+  swapTextures('velocity');
   swapTextures('density');
+  swapTextures('temperature');
 
   const forcesEncoder = device.createCommandEncoder({ label: 'External Forces Encoder' });
   const forcesPass = forcesEncoder.beginComputePass({ label: 'External Forces Pass' });

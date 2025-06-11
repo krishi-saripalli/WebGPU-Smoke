@@ -45,7 +45,10 @@ export const createRenderBindGroupLayout = (device: GPUDevice): GPUBindGroupLayo
 // ----- COMPUTE BIND GROUP LAYOUTS -----
 
 // Layout for densityCopy (replaces computeMain)
-export const createDensityCopyBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
+export const createDensityCopyBindGroupLayout = (
+  device: GPUDevice,
+  min16floatStorage: string
+): GPUBindGroupLayout => {
   return device.createBindGroupLayout({
     label: 'Density Copy Bind Group Layout',
     entries: [
@@ -59,7 +62,11 @@ export const createDensityCopyBindGroupLayout = (device: GPUDevice): GPUBindGrou
       {
         binding: 1, // Updated binding
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+        storageTexture: {
+          access: 'write-only',
+          format: min16floatStorage as GPUTextureFormat,
+          viewDimension: '3d',
+        },
       },
     ],
   });
@@ -150,7 +157,10 @@ export const createVorticityConfinementBindGroupLayout = (
   });
 };
 
-export const createAdvectionBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
+export const createAdvectionBindGroupLayout = (
+  device: GPUDevice,
+  min16floatStorage: string
+): GPUBindGroupLayout => {
   return device.createBindGroupLayout({
     label: 'Advection Bind Group Layout',
     entries: [
@@ -188,13 +198,21 @@ export const createAdvectionBindGroupLayout = (device: GPUDevice): GPUBindGroupL
       {
         binding: 5,
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+        storageTexture: {
+          access: 'write-only',
+          format: min16floatStorage as GPUTextureFormat,
+          viewDimension: '3d',
+        },
       },
       // advection_temperatureOut (@binding(6))
       {
         binding: 6,
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+        storageTexture: {
+          access: 'write-only',
+          format: min16floatStorage as GPUTextureFormat,
+          viewDimension: '3d',
+        },
       },
     ],
   });
@@ -202,7 +220,8 @@ export const createAdvectionBindGroupLayout = (device: GPUDevice): GPUBindGroupL
 
 // Layout for divergenceCalculation (replaces computeDivergence)
 export const createDivergenceCalculationBindGroupLayout = (
-  device: GPUDevice
+  device: GPUDevice,
+  min16floatStorage: string
 ): GPUBindGroupLayout => {
   return device.createBindGroupLayout({
     label: 'Divergence Calculation Bind Group Layout',
@@ -217,14 +236,21 @@ export const createDivergenceCalculationBindGroupLayout = (
       {
         binding: 1, // Updated binding
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+        storageTexture: {
+          access: 'write-only',
+          format: min16floatStorage as GPUTextureFormat,
+          viewDimension: '3d',
+        },
       },
     ],
   });
 };
 
 // Layout for pressureIteration (replaces solvePressureJacobi)
-export const createPressureIterationBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
+export const createPressureIterationBindGroupLayout = (
+  device: GPUDevice,
+  min16floatStorage: string
+): GPUBindGroupLayout => {
   return device.createBindGroupLayout({
     label: 'Pressure Iteration Bind Group Layout',
     entries: [
@@ -244,7 +270,11 @@ export const createPressureIterationBindGroupLayout = (device: GPUDevice): GPUBi
       {
         binding: 2, // Updated binding
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+        storageTexture: {
+          access: 'write-only',
+          format: min16floatStorage as GPUTextureFormat,
+          viewDimension: '3d',
+        },
       },
     ],
   });
@@ -279,7 +309,10 @@ export const createPressureGradientSubtractionBindGroupLayout = (
   });
 };
 
-export const createReinitializationBindGroupLayout = (device: GPUDevice): GPUBindGroupLayout => {
+export const createReinitializationBindGroupLayout = (
+  device: GPUDevice,
+  min16floatStorage: string
+): GPUBindGroupLayout => {
   return device.createBindGroupLayout({
     label: 'Reinitialization Bind Group Layout',
     entries: [
@@ -293,7 +326,11 @@ export const createReinitializationBindGroupLayout = (device: GPUDevice): GPUBin
       {
         binding: 1,
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+        storageTexture: {
+          access: 'write-only',
+          format: min16floatStorage as GPUTextureFormat,
+          viewDimension: '3d',
+        },
       },
       // densityIn (@binding(2))
       {
@@ -305,7 +342,11 @@ export const createReinitializationBindGroupLayout = (device: GPUDevice): GPUBin
       {
         binding: 3,
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '3d' },
+        storageTexture: {
+          access: 'write-only',
+          format: min16floatStorage as GPUTextureFormat,
+          viewDimension: '3d',
+        },
       },
       // velocityIn (@binding(4))
       {

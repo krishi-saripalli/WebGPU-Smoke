@@ -1,7 +1,7 @@
 @import "common.wgsl";
 
-@group(1) @binding(0) var vorticityIn: texture_3d<f32>;
-@group(1) @binding(1) var velocityIn: texture_3d<f32>;
+@group(1) @binding(0) var vorticityIn: texture_3d<min16float>;
+@group(1) @binding(1) var velocityIn: texture_3d<min16float>;
 @group(1) @binding(2) var velocityOut: texture_storage_3d<rgba16float, write>;
 
 
@@ -22,14 +22,14 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
                     length(textureLoad(vorticityIn, pos - vec3<i32>(0,1,0), 0).xyz);
   let dvort_mag_dz = length(textureLoad(vorticityIn, pos + vec3<i32>(0,0,1), 0).xyz) - 
                     length(textureLoad(vorticityIn, pos - vec3<i32>(0,0,1), 0).xyz);
-  var grad = vec3<f32>(dvort_mag_dx, dvort_mag_dy, dvort_mag_dz) / (2.0 * params.dx);
+  var grad = vec3<min16float>(dvort_mag_dx, dvort_mag_dy, dvort_mag_dz) / (2.0 * params.dx);
 
   let gradLength = length(grad);
   
   if (gradLength > 1e-6) {
     grad = grad / gradLength;
   } else {
-    grad = vec3<f32>(0.0);
+    grad = vec3<min16float>(0.0);
   }
 
   let vorticity = textureLoad(vorticityIn, id, 0).xyz;

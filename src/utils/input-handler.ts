@@ -12,7 +12,6 @@ export const handleKeyUp = (
   e: KeyboardEvent,
   setPressedKeys: React.Dispatch<React.SetStateAction<Set<string>>>
 ) => {
-  console.log('key up', e.code);
   setPressedKeys((prev) => {
     const next = new Set(prev);
     next.delete(e.code);

@@ -50,7 +50,12 @@ export interface RenderPipelineResources {
   vorticityForceTextureB: GPUTexture;
 }
 
-export const useRenderResources = (webGPUState: WebGPUState | null) => {
+export const useRenderResources = (
+  webGPUState: WebGPUState | null,
+  shaderHeader: string,
+  min16float: string,
+  min16floatStorage: string
+) => {
   const [resources, setResources] = useState<RenderPipelineResources | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
@@ -65,7 +70,12 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           throw new Error('Invalid common shader code: shader code is empty');
         }
 
-        const shaderModules = await loadShaderModules(device, SHADER_PATHS);
+        const shaderModules = await loadShaderModules(
+          device,
+          SHADER_PATHS,
+          shaderHeader,
+          min16floatStorage
+        );
 
         const gridSize = 100;
 
@@ -132,7 +142,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const densityTextureA = device.createTexture({
           size: [totalGridSize, totalGridSize, totalGridSize],
           dimension: '3d',
-          format: 'r32float',
+          format: min16floatStorage as GPUTextureFormat,
           usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.STORAGE_BINDING |
@@ -143,7 +153,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const temperatureTextureA = device.createTexture({
           size: [totalGridSize, totalGridSize, totalGridSize],
           dimension: '3d',
-          format: 'r32float',
+          format: min16floatStorage as GPUTextureFormat,
           usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.STORAGE_BINDING |
@@ -163,7 +173,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const densityTextureB = device.createTexture({
           size: [totalGridSize, totalGridSize, totalGridSize],
           dimension: '3d',
-          format: 'r32float',
+          format: min16floatStorage as GPUTextureFormat,
           usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.STORAGE_BINDING |
@@ -174,7 +184,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const temperatureTextureB = device.createTexture({
           size: [totalGridSize, totalGridSize, totalGridSize],
           dimension: '3d',
-          format: 'r32float',
+          format: min16floatStorage as GPUTextureFormat,
           usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.STORAGE_BINDING |
@@ -184,7 +194,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const pressureTextureA = device.createTexture({
           size: [totalGridSize, totalGridSize, totalGridSize],
           dimension: '3d',
-          format: 'r32float',
+          format: min16floatStorage as GPUTextureFormat,
           usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.STORAGE_BINDING |
@@ -194,7 +204,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const pressureTextureB = device.createTexture({
           size: [totalGridSize, totalGridSize, totalGridSize],
           dimension: '3d',
-          format: 'r32float',
+          format: min16floatStorage as GPUTextureFormat,
           usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.STORAGE_BINDING |
@@ -204,7 +214,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const divergenceTextureA = device.createTexture({
           size: [totalGridSize, totalGridSize, totalGridSize],
           dimension: '3d',
-          format: 'r32float',
+          format: min16floatStorage as GPUTextureFormat,
           usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.STORAGE_BINDING |
@@ -214,7 +224,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const divergenceTextureB = device.createTexture({
           size: [totalGridSize, totalGridSize, totalGridSize],
           dimension: '3d',
-          format: 'r32float',
+          format: min16floatStorage as GPUTextureFormat,
           usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.STORAGE_BINDING |
@@ -275,6 +285,8 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           [totalGridSize, totalGridSize, totalGridSize]
         );
 
+        //TODO: do these bytes (4 and 8 become 2 and 4) need to de dynamic based on the min16float type?
+        // or can I write in full precision from the javascript side and still re-interpret the values as f16 if enabled?
         device.queue.writeTexture(
           { texture: temperatureTextureA },
           initTemperatureData,
@@ -411,15 +423,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
           usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         });
         device.queue.writeBuffer(wireframeIndexBuffer, 0, wireframeIndices);
-        let shaderModule: GPUShaderModule;
-        try {
-          shaderModule = device.createShaderModule({ code: commonShaderCode });
-        } catch (e) {
-          throw new Error(
-            `Failed to create shader module: ${e instanceof Error ? e.message : String(e)}`
-          );
-        }
-
         const baseRenderPipelineDescriptor: Omit<
           GPURenderPipelineDescriptor,
           'label' | 'fragment' | 'depthStencil'
@@ -469,7 +472,6 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
             targets: [
               {
                 format: canvasFormat,
-                // No blending for wireframe - it should be opaque
               },
             ],
           },
@@ -520,7 +522,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const advectionPipelineLayout = device.createPipelineLayout({
           bindGroupLayouts: [
             uniformBindGroupLayout,
-            layouts.createAdvectionBindGroupLayout(device),
+            layouts.createAdvectionBindGroupLayout(device, min16floatStorage),
           ],
         });
         const advectionPipeline = createComputePipeline(
@@ -534,7 +536,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const divergenceCalculationPipelineLayout = device.createPipelineLayout({
           bindGroupLayouts: [
             uniformBindGroupLayout,
-            layouts.createDivergenceCalculationBindGroupLayout(device),
+            layouts.createDivergenceCalculationBindGroupLayout(device, min16floatStorage),
           ],
         });
         const divergenceCalculationPipeline = createComputePipeline(
@@ -548,7 +550,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const pressureIterationPipelineLayout = device.createPipelineLayout({
           bindGroupLayouts: [
             uniformBindGroupLayout,
-            layouts.createPressureIterationBindGroupLayout(device),
+            layouts.createPressureIterationBindGroupLayout(device, min16floatStorage),
           ],
         });
         const pressureIterationPipeline = createComputePipeline(
@@ -576,7 +578,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
         const reinitializationPipelineLayout = device.createPipelineLayout({
           bindGroupLayouts: [
             uniformBindGroupLayout,
-            layouts.createReinitializationBindGroupLayout(device),
+            layouts.createReinitializationBindGroupLayout(device, min16floatStorage),
           ],
         });
 
@@ -651,7 +653,7 @@ export const useRenderResources = (webGPUState: WebGPUState | null) => {
       setError(error instanceof Error ? error : new Error(String(error)));
       setResources(null);
     });
-  }, [webGPUState]);
+  }, [webGPUState, min16float, min16floatStorage, shaderHeader]);
 
   if (error) {
     console.warn('Render resources initialization failed:', error);

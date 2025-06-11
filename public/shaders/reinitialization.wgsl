@@ -1,11 +1,11 @@
 //re-initializes a heat and density source in the exact same way as initialization.ts
 @import "common.wgsl";
 
-@group(1) @binding(0) var temperatureIn: texture_3d<f32>;     
-@group(1) @binding(1) var temperatureOut: texture_storage_3d<r32float, write>;
-@group(1) @binding(2) var densityIn: texture_3d<f32>;
-@group(1) @binding(3) var densityOut: texture_storage_3d<r32float, write>;
-@group(1) @binding(4) var velocityIn: texture_3d<f32>;
+@group(1) @binding(0) var temperatureIn: texture_3d<min16float>;     
+@group(1) @binding(1) var temperatureOut: texture_storage_3d<min16float_storage, write>;
+@group(1) @binding(2) var densityIn: texture_3d<min16float>;
+@group(1) @binding(3) var densityOut: texture_storage_3d<min16float_storage, write>;
+@group(1) @binding(4) var velocityIn: texture_3d<min16float>;
 @group(1) @binding(5) var velocityOut: texture_storage_3d<rgba16float, write>;
 
 @compute @workgroup_size(4,4,4)

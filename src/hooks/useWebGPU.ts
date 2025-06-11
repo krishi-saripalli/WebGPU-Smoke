@@ -8,29 +8,51 @@ export interface WebGPUState {
 
 export const useWebGPU = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
   const [state, setState] = useState<WebGPUState | null>(null);
+  const [header, setHeader] = useState<string>('');
+  const [min16float, setMin16float] = useState<string>('');
+  const [min16floatStorage, setMin16floatStorage] = useState<string>('');
 
   useEffect(() => {
     const initWebGPU = async () => {
       if (!canvasRef.current || !navigator.gpu) return null;
 
       const adapter = await navigator.gpu.requestAdapter();
-      if (!adapter) return null;
-
-      // Check if the adapter supports filterable float textures
-      if (!adapter.features.has('float32-filterable')) {
-        console.error(
-          "Required WebGPU feature 'float32-filterable' is not supported on this browser/GPU."
-        );
-
-        return null;
-      } else {
-        console.log(
-          'Required WebGPU feature "float32-filterable" is supported on this browser/GPU!'
-        );
+      if (!adapter) {
+        throw new Error('No WebGPU adapter found');
       }
 
+      const hasShaderF16 = adapter.features.has('shader-f16');
+      //texture format tier 1 is required for using rfloat16 in write-only storage textures
+      // https://www.w3.org/TR/webgpu/#texture-formats-tier1
+      const hasTextureFormatTierOne = adapter.features.has('texture-format-tier-1');
+      const hasFloat32Filterable = adapter.features.has('float32-filterable');
+      console.log('hasShaderF16', hasShaderF16);
+      console.log('hasTextureFormatTierOne', hasTextureFormatTierOne);
+      console.log('hasFloat32Filterable', hasFloat32Filterable);
+      let requiredFeatures: GPUFeatureName[] = [];
+
+      if (hasShaderF16 && hasTextureFormatTierOne) {
+        console.log('Shader F16 and Texture Format Tier 1 are supported');
+        requiredFeatures.push('shader-f16');
+      } else {
+        if (hasFloat32Filterable) {
+          requiredFeatures.push('float32-filterable');
+        } else {
+          console.log('No float32 filterable support and no shader f16 support');
+          throw new Error('No float32 filterable support and no shader f16 support');
+        }
+      }
+      //if f16 is supported, use f16, otherwise use f32
+      const min16float = hasShaderF16 && hasTextureFormatTierOne ? 'f16' : 'f32';
+      const min16floatStorage = hasShaderF16 && hasTextureFormatTierOne ? 'r16float' : 'r32float';
+      const header =
+        hasShaderF16 && hasTextureFormatTierOne
+          ? `enable f16;
+     alias min16float = ${min16float};`
+          : `alias min16float = ${min16float};`;
+
       const device = await adapter.requestDevice({
-        requiredFeatures: ['float32-filterable'],
+        requiredFeatures: requiredFeatures,
       });
       const context = canvasRef.current.getContext('webgpu');
       if (!context) return null;
@@ -43,10 +65,13 @@ export const useWebGPU = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
       });
 
       setState({ device, context, canvasFormat });
+      setHeader(header);
+      setMin16float(min16float);
+      setMin16floatStorage(min16floatStorage);
     };
 
     initWebGPU();
   }, [canvasRef]);
 
-  return state;
+  return { state, header, min16float, min16floatStorage };
 };

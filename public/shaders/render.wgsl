@@ -21,7 +21,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 }
 
 @group(1) @binding(0)
-var densityIn: texture_3d<f32>;
+var densityIn: texture_3d<min16float>;
 
 @group(1) @binding(1)
 var densitySampler: sampler;

@@ -1,8 +1,8 @@
 @import "common.wgsl";
 
-@group(1) @binding(0) var pressureIn: texture_3d<f32>;
-@group(1) @binding(1) var divergenceIn: texture_3d<f32>;
-@group(1) @binding(2) var pressureOut: texture_storage_3d<r32float, write>;
+@group(1) @binding(0) var pressureIn: texture_3d<min16float>;
+@group(1) @binding(1) var divergenceIn: texture_3d<min16float>;
+@group(1) @binding(2) var pressureOut: texture_storage_3d<min16float_storage, write>;
 
 @compute @workgroup_size(4,4,4)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {

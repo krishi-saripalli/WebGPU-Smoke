@@ -63,10 +63,11 @@ export async function processShaderImports(
   return processedCode;
 }
 
-// New function to load multiple shaders
 export async function loadShaderModules(
   device: GPUDevice,
-  paths: Record<string, string>
+  paths: Record<string, string>,
+  shaderHeader: string,
+  min16floatStorage: string
 ): Promise<Record<string, GPUShaderModule>> {
   const modules: Record<string, GPUShaderModule> = {};
 
@@ -74,10 +75,13 @@ export async function loadShaderModules(
     try {
       const shaderCode = await loadShader(path);
       // Process imports before creating module
-      const processedCode = await processShaderImports(shaderCode);
+      var processedCode = await processShaderImports(shaderCode);
+
+      //replace all instances of min16float_storage in shader code with min16floatStorage
+      processedCode = processedCode.replace(/min16float_storage/g, min16floatStorage);
 
       modules[name] = device.createShaderModule({
-        code: processedCode,
+        code: shaderHeader + `\n` + processedCode,
         label: `Shader module: ${name}`,
       });
     } catch (error) {

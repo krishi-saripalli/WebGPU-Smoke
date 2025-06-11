@@ -1,7 +1,7 @@
 @import "common.wgsl";
 
-@group(1) @binding(0) var velocityIn: texture_3d<f32>;
-@group(1) @binding(1) var pressureIn: texture_3d<f32>;
+@group(1) @binding(0) var velocityIn: texture_3d<min16float>;
+@group(1) @binding(1) var pressureIn: texture_3d<min16float>;
 @group(1) @binding(2) var velocityOut: texture_storage_3d<rgba16float, write>;
 
 @compute @workgroup_size(4,4,4)
@@ -27,5 +27,5 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let velocity = textureLoad(velocityIn, id, 0).xyz;
   let pressureGradient = vec3f(dp_dx, dp_dy, dp_dz);
 
-  textureStore(velocityOut, id, vec4f(velocity - pressureGradient, 0.0)); // TODO: do I need dt here?
+  textureStore(velocityOut, id, vec4f(velocity - pressureGradient, 0.0));
 } 

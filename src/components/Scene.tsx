@@ -37,7 +37,11 @@ import {
   createAdvectionBindGroupLayout,
 } from '@/utils/layouts';
 
-const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineResources): void => {
+const renderScene = (
+  webGPUState: WebGPUState,
+  renderResources: RenderPipelineResources,
+  min16floatStorage: string
+): void => {
   const { device, context } = webGPUState;
   const {
     // Render Pipelines,
@@ -98,7 +102,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   ];
 
   //TODO: Different behaviour for even and odd number of iterations?
-  const JACOBI_ITERATIONS = 120;
+  const JACOBI_ITERATIONS = 30;
 
   const swapTextures = (resource: keyof SimulationState) => {
     const temp = simulationState[resource].current;
@@ -118,7 +122,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   advectPass.setPipeline(advectionPipeline);
   const advectBindGroup = createAdvectionBindGroup(
     device,
-    createAdvectionBindGroupLayout(device),
+    createAdvectionBindGroupLayout(device, min16floatStorage),
     simulationState.velocity.current,
     simulationState.density.current,
     simulationState.temperature.current,
@@ -192,7 +196,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   divergencePass.setPipeline(divergenceCalculationPipeline);
   const divergenceBindGroup = createDivergenceCalculationBindGroup(
     device,
-    createDivergenceCalculationBindGroupLayout(device),
+    createDivergenceCalculationBindGroupLayout(device, min16floatStorage),
     simulationState.velocity.current,
     simulationState.divergence.next
   );
@@ -211,7 +215,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   for (let i = 0; i < JACOBI_ITERATIONS; i++) {
     const pressureBindGroup = createPressureIterationBindGroup(
       device,
-      createPressureIterationBindGroupLayout(device),
+      createPressureIterationBindGroupLayout(device, min16floatStorage),
       simulationState.divergence.current,
       simulationState.pressure.current,
       simulationState.pressure.next
@@ -251,7 +255,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
   reinitializationPass.setBindGroup(0, uniformBindGroup);
   const reinitializationBindGroup = createReinitializationBindGroup(
     device,
-    createReinitializationBindGroupLayout(device),
+    createReinitializationBindGroupLayout(device, min16floatStorage),
     simulationState.temperature.current,
     simulationState.temperature.next,
     simulationState.density.current,
@@ -276,7 +280,7 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
       {
         view: multisampleTexture.createView(),
         resolveTarget: context.getCurrentTexture().createView(),
-        clearValue: { r: 0.3085, g: 0.2031, b: 0.0234, a: 1 }, //dark brown
+        clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1 }, //dark brown
         loadOp: 'clear',
         storeOp: 'store',
       },
@@ -312,8 +316,13 @@ const renderScene = (webGPUState: WebGPUState, renderResources: RenderPipelineRe
 
 export const WebGPUCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const webGPUState = useWebGPU(canvasRef as React.RefObject<HTMLCanvasElement>);
-  const renderResources = useRenderResources(webGPUState);
+  const {
+    state: webGPUState,
+    header,
+    min16float,
+    min16floatStorage,
+  } = useWebGPU(canvasRef as React.RefObject<HTMLCanvasElement>);
+  const renderResources = useRenderResources(webGPUState, header, min16float, min16floatStorage);
   const [pressedKeys, setPressedKeys] = useState(new Set<string>());
   const pressedKeysRef = useRef(new Set<string>());
   const [isDragging, setIsDragging] = useState(false);
@@ -372,7 +381,7 @@ export const WebGPUCanvas = () => {
         forward as Float32Array
       );
 
-      renderScene(webGPUState, renderResources);
+      renderScene(webGPUState, renderResources, min16floatStorage);
 
       frameId = requestAnimationFrame(animationLoop);
     }
@@ -426,10 +435,10 @@ export const WebGPUCanvas = () => {
           forward as Float32Array
         );
 
-        renderScene(webGPUState, renderResources);
+        renderScene(webGPUState, renderResources, min16floatStorage);
       }
     },
-    [isDragging, prevMousePos, renderResources, webGPUState]
+    [isDragging, prevMousePos, renderResources, webGPUState, min16floatStorage]
   );
 
   return (

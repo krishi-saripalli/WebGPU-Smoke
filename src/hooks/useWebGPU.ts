@@ -22,18 +22,18 @@ export const useWebGPU = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
       }
 
       const hasShaderF16 = adapter.features.has('shader-f16');
-      //texture format tier 1 is required for using rfloat16 in write-only storage textures
-      // https://www.w3.org/TR/webgpu/#texture-formats-tier1
-      const hasTextureFormatTierOne = adapter.features.has('texture-format-tier-1');
+
       const hasFloat32Filterable = adapter.features.has('float32-filterable');
       console.log('hasShaderF16', hasShaderF16);
-      console.log('hasTextureFormatTierOne', hasTextureFormatTierOne);
       console.log('hasFloat32Filterable', hasFloat32Filterable);
       let requiredFeatures: GPUFeatureName[] = [];
 
-      if (hasShaderF16 && hasTextureFormatTierOne) {
-        console.log('Shader F16 and Texture Format Tier 1 are supported');
-        requiredFeatures.push('shader-f16');
+      if (hasShaderF16) {
+        console.log('Shader F16 and Texture supported but not pushing to requiredFeatures');
+        // requiredFeatures.push('shader-f16');
+        if (hasFloat32Filterable) {
+          requiredFeatures.push('float32-filterable');
+        }
       } else {
         if (hasFloat32Filterable) {
           requiredFeatures.push('float32-filterable');
@@ -43,13 +43,12 @@ export const useWebGPU = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
         }
       }
       //if f16 is supported, use f16, otherwise use f32
-      const min16float = hasShaderF16 && hasTextureFormatTierOne ? 'f16' : 'f32';
-      const min16floatStorage = hasShaderF16 && hasTextureFormatTierOne ? 'r16float' : 'r32float';
-      const header =
-        hasShaderF16 && hasTextureFormatTierOne
-          ? `enable f16;
-     alias min16float = ${min16float};`
-          : `alias min16float = ${min16float};`;
+      const min16float = hasShaderF16 ? 'f32' : 'f32';
+      const min16floatStorage = hasShaderF16 ? 'r32float' : 'r32float';
+      const header = hasShaderF16
+        ? // need to add enable f16; if f16 is supported
+          ` alias min16float = ${min16float};`
+        : `alias min16float = ${min16float};`;
 
       const device = await adapter.requestDevice({
         requiredFeatures: requiredFeatures,

@@ -8,7 +8,15 @@ struct Uniforms {
     gridSize        : vec3<u32>, // This is the INTERNAL grid size (e.g., 100x100x100)
     _pad1           : u32,          // forces 16-byte alignment after vec3<u32>
     cameraForward   : vec3<f32>,
-    _pad2           : f32            // forces 16-byte alignment after vec3<f32>
+    _pad2           : f32,            // forces 16-byte alignment after vec3<f32>
+    cameraPos       : vec3<f32>,    // world space position of the camera (eyePos)
+    absorption      : f32,          // coefficient for light absorption by smoke
+    lightPosition   : vec3<f32>,    // world space position of the light source
+    _pad3           : f32,          // forces 16-byte alignment after vec3<f32>
+    lightIntensity  : vec3<f32>,    // color and strength of the light
+    _pad4           : f32,          // forces 16-byte alignment after vec3<f32>
+    ratio           : vec3<f32>,    // aspect ratio of simulation grid
+    _pad5           : f32           // forces 16-byte alignment after vec3<f32>
 };
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;

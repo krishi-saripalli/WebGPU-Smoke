@@ -93,8 +93,8 @@ export const useRenderResources = (
         });
 
         const camera = new Camera({
-          position: new Vec3([-1.5, 0, 2.5]),
-          forward: new Vec3([1, 0, -1]),
+          position: new Vec3([0, 0, 2.5]),
+          forward: new Vec3([0, 0, -1]),
           up: new Vec3([0, 1, 0]),
           heightAngle: Math.PI / 2,
           near: 0.1,
@@ -107,6 +107,11 @@ export const useRenderResources = (
           projectionMatrix: camera.getProjectionMatrix() as unknown as Float32Array,
           gridSize: [internalGridSize, internalGridSize, internalGridSize],
           cameraForward: camera.getForward(),
+          cameraPos: camera.getPosition(),
+          lightPosition: [2.0, 3.0, 2.0],
+          lightIntensity: [0.0, 1.0, 0.0],
+          ratio: [1.0, 1.0, 1.0],
+          absorption: 1.0,
         });
 
         device.queue.writeBuffer(uniformBuffer, 0, uniformsView.arrayBuffer);
@@ -121,10 +126,10 @@ export const useRenderResources = (
         simulationParamsView.set({
           dt: 0.01,
           dx: 1.0 / internalGridSize,
-          vorticityStrength: 7.0,
-          buoyancyAlpha: 100.0,
+          vorticityStrength: 10.0,
+          buoyancyAlpha: 9.8,
           buoyancyBeta: 15.0,
-          ambientTemperature: 1.0,
+          ambientTemperature: 100.0,
         });
 
         device.queue.writeBuffer(simulationParamsBuffer, 0, simulationParamsView.arrayBuffer);

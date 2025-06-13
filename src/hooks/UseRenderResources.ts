@@ -50,6 +50,12 @@ export interface RenderPipelineResources {
   vorticityForceTextureB: GPUTexture;
 }
 
+const commonShaderCode = await loadShader(SHADER_PATHS.common);
+if (!commonShaderCode || commonShaderCode.trim().length === 0) {
+  throw new Error('Invalid common shader code: shader code is empty');
+}
+export const shaderDefs = makeShaderDataDefinitions(commonShaderCode);
+
 export const useRenderResources = (
   webGPUState: WebGPUState | null,
   shaderHeader: string,
@@ -64,11 +70,6 @@ export const useRenderResources = (
       try {
         if (!webGPUState) return;
         const { device, canvasFormat } = webGPUState;
-
-        const commonShaderCode = await loadShader(SHADER_PATHS.common);
-        if (!commonShaderCode || commonShaderCode.trim().length === 0) {
-          throw new Error('Invalid common shader code: shader code is empty');
-        }
 
         const shaderModules = await loadShaderModules(
           device,
@@ -93,7 +94,7 @@ export const useRenderResources = (
         });
 
         const camera = new Camera({
-          position: new Vec3([0, 0, 2.5]),
+          position: new Vec3([0, 0, 2.0]),
           forward: new Vec3([0, 0, -1]),
           up: new Vec3([0, 1, 0]),
           heightAngle: Math.PI / 2,
@@ -108,7 +109,7 @@ export const useRenderResources = (
           gridSize: [internalGridSize, internalGridSize, internalGridSize],
           cameraForward: camera.getForward(),
           cameraPos: camera.getPosition(),
-          lightPosition: [2.0, 3.0, 2.0],
+          lightPosition: [0.0, 0.9, 0.0],
           lightIntensity: [0.0, 1.0, 0.0],
           ratio: [1.0, 1.0, 1.0],
           absorption: 1.0,

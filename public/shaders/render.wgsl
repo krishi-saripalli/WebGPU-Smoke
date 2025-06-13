@@ -41,7 +41,7 @@ fn phaseHG(cosTheta: f32, g: f32) -> f32 {
 
 @fragment
 fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
-  //color the floor slightly grey {
+  //color the floor slightly grey
   if (vertexOut.texCoord.y < 0.01) {
     return vec4f(0.1, 0.1, 0.1, 1.0);
   }
@@ -69,7 +69,7 @@ fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
         if (density > 0.01) {
           var lightTransmittance = 1.0;
           let lightDirection = normalize(uniforms.lightPosition - currentPosition);
-          let numShadowSteps = 10u;
+          let numShadowSteps = 3u;
           for (var j : u32 = 1; j < numShadowSteps; j++) {
             let shadowPosition = currentPosition + lightDirection * f32(j) * stepSize;
             let shadowTexCoord = (shadowPosition + vec3f(1.0)) * 0.5;
@@ -88,11 +88,6 @@ fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
 
           transmittance *= exp(-density * stepSize * uniforms.absorption);
         }
-    }
-
-
-    if (transmittance < 0.01) {
-      break;
     }
   }
 

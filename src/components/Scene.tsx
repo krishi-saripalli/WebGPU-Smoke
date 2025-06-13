@@ -308,11 +308,11 @@ const renderScene = (
   renderPass.drawIndexed(slicesIndexCount);
 
   // wireframe
-  // renderPass.setPipeline(wireframePipeline);
-  // renderPass.setBindGroup(0, uniformBindGroup);
-  // renderPass.setVertexBuffer(0, wireframeVertexBuffer);
-  // renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
-  // renderPass.drawIndexed(wireframeIndexCount);
+  renderPass.setPipeline(wireframePipeline);
+  renderPass.setBindGroup(0, uniformBindGroup);
+  renderPass.setVertexBuffer(0, wireframeVertexBuffer);
+  renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
+  renderPass.drawIndexed(wireframeIndexCount);
 
   renderPass.end();
   device.queue.submit([renderEncoder.finish()]);
@@ -408,16 +408,15 @@ export const WebGPUCanvas = () => {
 
       const t = elapsedTime * rotationSpeed;
 
-      // Circle on the y = 0.8 plane
-      const lightX = circleRadius * (0.5 * Math.sin(t) + 0.5);
+      //debug with a fixed light position
+      const lightX = 0.0;
       const lightY = 0.0;
       const lightZ = 0.5;
 
       lightPositionView.set({
-        lightPosition: [lightX, lightY, lightX], //this is broken
+        lightPosition: [lightX, lightY, lightZ], //this is broken
       });
 
-      // Write to specific offsets in the uniform buffer
       // viewMatrix is at offset 0, cameraForward is at offset 16*4 + 16*4 + 3*4 + 4 = 148 bytes
       webGPUState.device.queue.writeBuffer(
         renderResources.uniformBuffer,

@@ -75,7 +75,7 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
         temperature = params.ambientTemperature + 400.0;
 
         if (internalY <= densityHeight) { 
-          density = 0.7;
+          density = 1.0;
         }
       }
 

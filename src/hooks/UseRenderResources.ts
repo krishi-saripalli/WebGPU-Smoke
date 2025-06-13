@@ -3,7 +3,7 @@ import { WebGPUState } from './useWebGPU';
 import { Camera } from '@/modules/Camera';
 import { Vec3 } from 'gl-matrix';
 import { loadShader, loadShaderModules } from '@/utils/shader-loader';
-import { generateSlices, generateWireframe } from '@/utils/geometry';
+import { generateBox, generateSlices, generateWireframe } from '@/utils/geometry';
 import { initializeSimulationData } from '@/utils/initializion';
 import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
 import * as layouts from '@/utils/layouts';
@@ -395,7 +395,7 @@ export const useRenderResources = (
         });
 
         const { vertexPositions: slicesVertexPositions, indicesList: slicesIndicesList } =
-          generateSlices(internalGridSize);
+          generateBox();
 
         const slicesVertices = new Float32Array(slicesVertexPositions);
         const slicesIndices = new Uint32Array(slicesIndicesList);
@@ -447,7 +447,7 @@ export const useRenderResources = (
             ],
           },
           multisample: { count: 4 },
-          primitive: { topology: 'triangle-list' },
+          primitive: { topology: 'triangle-list', cullMode: 'back' },
         };
 
         const slicesPipeline = device.createRenderPipeline({

@@ -110,9 +110,9 @@ export const useRenderResources = (
           cameraForward: camera.getForward(),
           cameraPos: camera.getPosition(),
           lightPosition: [0.0, 0.9, 0.0],
-          lightIntensity: [0.0, 1.0, 0.0],
+          lightIntensity: [0.0, 200.0, 100.0],
           ratio: [1.0, 1.0, 1.0],
-          absorption: 1.0,
+          absorption: 0.5,
         });
 
         device.queue.writeBuffer(uniformBuffer, 0, uniformsView.arrayBuffer);

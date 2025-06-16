@@ -353,6 +353,13 @@ export const WebGPUCanvas = () => {
   `);
   const lightPositionView = makeStructuredView(lightPositionDef.structs.LightPositionUpdate);
 
+  const cameraPosDef = makeShaderDataDefinitions(`
+    struct CameraPosUpdate {
+      cameraPos: vec3<f32>,
+    };
+  `);
+  const cameraPosView = makeStructuredView(cameraPosDef.structs.CameraPosUpdate);
+
   useEffect(() => {
     pressedKeysRef.current = pressedKeys;
   }, [pressedKeys]);
@@ -417,6 +424,10 @@ export const WebGPUCanvas = () => {
         lightPosition: [lightX, lightY, lightZ], //this is broken
       });
 
+      cameraPosView.set({
+        cameraPos: renderResources.camera.getPosition(),
+      });
+
       // viewMatrix is at offset 0, cameraForward is at offset 16*4 + 16*4 + 3*4 + 4 = 148 bytes
       webGPUState.device.queue.writeBuffer(
         renderResources.uniformBuffer,
@@ -435,6 +446,12 @@ export const WebGPUCanvas = () => {
         renderResources.uniformBuffer,
         180, // lightPosition offset
         lightPositionView.arrayBuffer
+      );
+
+      webGPUState.device.queue.writeBuffer(
+        renderResources.uniformBuffer,
+        160, // cameraPos offset
+        cameraPosView.arrayBuffer
       );
 
       renderScene(webGPUState, renderResources, min16floatStorage);
@@ -483,6 +500,10 @@ export const WebGPUCanvas = () => {
           cameraForward: renderResources.camera.getForward(),
         });
 
+        cameraPosView.set({
+          cameraPos: renderResources.camera.getPosition(),
+        });
+
         // Write to specific offsets in the uniform buffer
         webGPUState.device.queue.writeBuffer(
           renderResources.uniformBuffer,
@@ -493,6 +514,12 @@ export const WebGPUCanvas = () => {
           renderResources.uniformBuffer,
           148, // cameraForward offset
           cameraForwardView.arrayBuffer
+        );
+
+        webGPUState.device.queue.writeBuffer(
+          renderResources.uniformBuffer,
+          160, // cameraPos offset
+          cameraPosView.arrayBuffer
         );
 
         renderScene(webGPUState, renderResources, min16floatStorage);
@@ -506,6 +533,7 @@ export const WebGPUCanvas = () => {
       min16floatStorage,
       viewMatrixView,
       cameraForwardView,
+      cameraPosView,
     ]
   );
 

@@ -447,7 +447,7 @@ export const useRenderResources = (
             ],
           },
           multisample: { count: 4 },
-          primitive: { topology: 'triangle-list', cullMode: 'back' },
+          primitive: { topology: 'triangle-list', cullMode: 'none' },
         };
 
         const slicesPipeline = device.createRenderPipeline({

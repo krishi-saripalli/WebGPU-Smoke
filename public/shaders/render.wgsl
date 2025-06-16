@@ -63,7 +63,7 @@ fn phase(cosTheta: f32, g: f32) -> f32 {
 //returns the light attenuation coefficient by sampling point between the primary sample and light position
 fn inScattering(currentPosition : vec3f) -> f32 {
   let directionToLight = normalize(uniforms.lightPosition - currentPosition);
-  let numSteps = 32u;
+  let numSteps = 3u;
   let rayLength = length(uniforms.lightPosition - currentPosition);
   let stepSize = rayLength / f32(numSteps);
   var totalDensity = 0.0;
@@ -94,7 +94,7 @@ fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
     discard;
   }
   
-  let numSteps = 64u;
+  let numSteps = 50u;
   let rayLength = tmax - tmin;
   let stepSize = rayLength / f32(numSteps);
   

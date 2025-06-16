@@ -27,6 +27,8 @@ export function updateCameraPosition(camera: Camera, pressedKeys: Set<string>): 
     vec3.scaleAndAdd(newPosition, newPosition, right, MOVEMENT_SPEED);
   }
 
+  console.log(newPosition);
+
   // Update camera position
   vec3.copy(position, newPosition);
 }

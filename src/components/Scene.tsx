@@ -307,12 +307,12 @@ const renderScene = (
   renderPass.setIndexBuffer(slicesIndexBuffer, 'uint32');
   renderPass.drawIndexed(slicesIndexCount);
 
-  // wireframe
-  renderPass.setPipeline(wireframePipeline);
-  renderPass.setBindGroup(0, uniformBindGroup);
-  renderPass.setVertexBuffer(0, wireframeVertexBuffer);
-  renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
-  renderPass.drawIndexed(wireframeIndexCount);
+  // // wireframe
+  // renderPass.setPipeline(wireframePipeline);
+  // renderPass.setBindGroup(0, uniformBindGroup);
+  // renderPass.setVertexBuffer(0, wireframeVertexBuffer);
+  // renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
+  // renderPass.drawIndexed(wireframeIndexCount);
 
   renderPass.end();
   device.queue.submit([renderEncoder.finish()]);
@@ -352,6 +352,13 @@ export const WebGPUCanvas = () => {
     };
   `);
   const lightPositionView = makeStructuredView(lightPositionDef.structs.LightPositionUpdate);
+
+  const lightPosition2Def = makeShaderDataDefinitions(`
+    struct LightPosition2Update {
+      lightPosition2: vec3<f32>,
+    };
+  `);
+  const lightPosition2View = makeStructuredView(lightPosition2Def.structs.LightPosition2Update);
 
   const cameraPosDef = makeShaderDataDefinitions(`
     struct CameraPosUpdate {
@@ -410,18 +417,25 @@ export const WebGPUCanvas = () => {
         cameraForward: renderResources.camera.getForward(),
       });
 
-      const circleRadius = 1.0;
+      const radius = 1.0;
       const rotationSpeed = 0.6;
 
       const t = elapsedTime * rotationSpeed;
 
-      //debug with a fixed light position
-      const lightX = 0.0;
+      const lightX = radius * Math.cos(t);
       const lightY = 0.0;
-      const lightZ = 0.5;
+      const lightZ = radius * Math.sin(t);
 
       lightPositionView.set({
-        lightPosition: [lightX, lightY, lightZ], //this is broken
+        lightPosition: [lightX, lightY, lightZ],
+      });
+
+      const light2X = radius * Math.cos(-t);
+      const light2Y = 0.0;
+      const light2Z = radius * Math.sin(-t);
+
+      lightPosition2View.set({
+        lightPosition2: [light2X, light2Y, light2Z],
       });
 
       cameraPosView.set({
@@ -440,12 +454,18 @@ export const WebGPUCanvas = () => {
         cameraForwardView.arrayBuffer
       );
 
-      // lightPosition offset calculation:
-      // cameraForward(148) + vec3<f32>(12) + _pad2(4) + cameraPos(12) + absorption(4) = 180
       webGPUState.device.queue.writeBuffer(
         renderResources.uniformBuffer,
-        180, // lightPosition offset
+        176, // lightPosition offset
         lightPositionView.arrayBuffer
+      );
+
+      // lightPosition2 offset calculation:
+      // lightPosition(176) + vec3<f32>(12) + _pad3(4) + lightIntensity(12) + _pad4(4) + ratio(12) + _pad5(4) = 224
+      webGPUState.device.queue.writeBuffer(
+        renderResources.uniformBuffer,
+        224, // lightPosition2 offset
+        lightPosition2View.arrayBuffer
       );
 
       webGPUState.device.queue.writeBuffer(
@@ -534,6 +554,8 @@ export const WebGPUCanvas = () => {
       viewMatrixView,
       cameraForwardView,
       cameraPosView,
+      lightPositionView,
+      lightPosition2View,
     ]
   );
 

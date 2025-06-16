@@ -1,4 +1,3 @@
-
 @import "common.wgsl";
 
 //TODO: get rid of wireframe and shade outside of the box
@@ -61,10 +60,10 @@ fn phase(cosTheta: f32, g: f32) -> f32 {
 }
 
 //returns the light attenuation coefficient by sampling point between the primary sample and light position
-fn inScattering(currentPosition : vec3f) -> f32 {
-  let directionToLight = normalize(uniforms.lightPosition - currentPosition);
+fn inScattering(currentPosition : vec3f, lightPos: vec3f) -> f32 {
+  let directionToLight = normalize(lightPos - currentPosition);
   let numSteps = 3u;
-  let rayLength = length(uniforms.lightPosition - currentPosition);
+  let rayLength = length(lightPos - currentPosition);
   let stepSize = rayLength / f32(numSteps);
   var totalDensity = 0.0;
 
@@ -76,6 +75,23 @@ fn inScattering(currentPosition : vec3f) -> f32 {
     totalDensity += textureSampleLevel(densityIn, densitySampler, texCoord, 0.0).x;
   }
   return exp(-totalDensity * stepSize * uniforms.absorption);
+}
+
+fn radiance(currentPosition: vec3f, rayDirection: vec3f, density: f32, stepSize: f32, transmission: f32) -> vec3f {
+  var radiance = vec3f(0.0);
+  
+  if (density > 0.001) {
+    let attenuation1 = inScattering(currentPosition, uniforms.lightPosition);
+    let cosTheta1 = dot(normalize(-rayDirection), normalize(uniforms.lightPosition - currentPosition));
+    let scattering = 1.0 - uniforms.absorption;
+    radiance += uniforms.lightIntensity * attenuation1 * phase(cosTheta1, 0.5) * scattering * transmission * stepSize * density;
+    
+    let attenuation2 = inScattering(currentPosition, uniforms.lightPosition2);
+    let cosTheta2 = dot(normalize(-rayDirection), normalize(uniforms.lightPosition2 - currentPosition));
+    radiance += uniforms.lightIntensity2 * attenuation2 * phase(cosTheta2, 0.5) * scattering * transmission * stepSize * density;
+  }
+  
+  return radiance;
 }
 
 @fragment
@@ -94,7 +110,7 @@ fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
     discard;
   }
   
-  let numSteps = 50u;
+  let numSteps = 64u;
   let rayLength = tmax - tmin;
   let stepSize = rayLength / f32(numSteps);
   
@@ -114,10 +130,8 @@ fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
     transmission *= sampleTransmission;
 
     if (density > 0.001) {
-      let attenuation = inScattering(currentPosition);
-      let cosTheta = dot(normalize(-rayDirection), normalize(uniforms.lightPosition - currentPosition));
-      let scattering = 1.0 - uniforms.absorption;
-      finalColor += uniforms.lightIntensity * attenuation * phase(cosTheta,0.5) * scattering * transmission * stepSize * density;
+      let radiance = radiance(currentPosition, rayDirection, density, stepSize, transmission);
+      finalColor += radiance;
     }
 
     if (transmission < 0.001) {

@@ -284,7 +284,7 @@ const renderScene = (
       {
         view: multisampleTexture.createView(),
         resolveTarget: context.getCurrentTexture().createView(),
-        clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1 }, //dark brown
+        clearValue: { r: 0.3945, g: 0.457, b: 0.4531, a: 1 },
         loadOp: 'clear',
         storeOp: 'store',
       },
@@ -423,8 +423,8 @@ export const WebGPUCanvas = () => {
       const t = elapsedTime * rotationSpeed;
 
       const lightX = radius * Math.cos(t);
-      const lightY = 0.0;
-      const lightZ = radius * Math.sin(t);
+      const lightY = radius * Math.sin(t);
+      const lightZ = -0.5;
 
       lightPositionView.set({
         lightPosition: [lightX, lightY, lightZ],
@@ -462,11 +462,11 @@ export const WebGPUCanvas = () => {
 
       // lightPosition2 offset calculation:
       // lightPosition(176) + vec3<f32>(12) + _pad3(4) + lightIntensity(12) + _pad4(4) + ratio(12) + _pad5(4) = 224
-      webGPUState.device.queue.writeBuffer(
-        renderResources.uniformBuffer,
-        224, // lightPosition2 offset
-        lightPosition2View.arrayBuffer
-      );
+      // webGPUState.device.queue.writeBuffer(
+      //   renderResources.uniformBuffer,
+      //   224, // lightPosition2 offset
+      //   lightPosition2View.arrayBuffer
+      // );
 
       webGPUState.device.queue.writeBuffer(
         renderResources.uniformBuffer,

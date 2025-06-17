@@ -113,7 +113,7 @@ export const useRenderResources = (
           lightIntensity: [0.0, 80.0, 80.0],
           ratio: [1.0, 1.0, 1.0],
           absorption: 0.4,
-          lightPosition2: [0.0, -0.9, 0.0],
+          lightPosition2: [0.0, 0.9, 0.0],
           lightIntensity2: [80.0, 20.0, 8.0],
         });
 

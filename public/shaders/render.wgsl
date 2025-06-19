@@ -62,7 +62,7 @@ fn phase(cosTheta: f32, g: f32) -> f32 {
 //returns the light attenuation coefficient by sampling point between the primary sample and light position
 fn inScattering(currentPosition : vec3f, lightPos: vec3f) -> f32 {
   let directionToLight = normalize(lightPos - currentPosition);
-  let numSteps = 10u;
+  let numSteps = 1u;
   let rayLength = length(lightPos - currentPosition);
   let stepSize = rayLength / f32(numSteps);
   var totalDensity = 0.0;
@@ -86,14 +86,14 @@ fn radiance(currentPosition: vec3f, rayDirection: vec3f, density: f32, stepSize:
     let attenuation1 = inScattering(currentPosition, uniforms.lightPosition);
     let cosTheta1 = dot(normalize(-rayDirection), normalize(positionToLight1));
     
-    let falloff1 = 1.0 / (1.0 +  dot(positionToLight1,positionToLight1));
-    radiance += uniforms.lightIntensity * falloff1 * attenuation1 * phase(cosTheta1, 0.5) * scattering * transmission * stepSize * density;
+    radiance += uniforms.lightIntensity * attenuation1 * phase(cosTheta1, 0.1) * scattering * transmission * stepSize * density;
     
-    let positionToLight2 = uniforms.lightPosition2 - currentPosition;
-    let attenuation2 = inScattering(currentPosition, uniforms.lightPosition2);
-    let cosTheta2 = dot(normalize(-rayDirection), normalize(positionToLight2));
-    let falloff2 = 1.0 / (1.0 + dot(positionToLight2,positionToLight2));
-    radiance += uniforms.lightIntensity2 * falloff2 * attenuation2 * phase(cosTheta2, 0.5) * scattering * transmission * stepSize * density;
+    // TODO: Make this less expensive somehow
+    // let positionToLight2 = uniforms.lightPosition2 - currentPosition;
+    // let attenuation2 = inScattering(currentPosition, uniforms.lightPosition2);
+    // let cosTheta2 = dot(normalize(-rayDirection), normalize(positionToLight2));
+    // let falloff2 = 1.0 / (1.0 + dot(positionToLight2,positionToLight2));
+    // radiance += uniforms.lightIntensity2 * falloff2 * attenuation2 * phase(cosTheta2, 0.5) * scattering * transmission * stepSize * density;
   }
   
   return radiance;
@@ -115,7 +115,7 @@ fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
     discard;
   }
   
-  let numSteps = 64u;
+  let numSteps = 40u;
   let rayLength = tmax - tmin;
   let stepSize = rayLength / f32(numSteps);
   
@@ -138,7 +138,7 @@ fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
       break;
     }
 
-    if (density > 0.001) {
+    if (density > 0.01) {
       let radiance = radiance(currentPosition, rayDirection, density, stepSize, transmission);
       finalColor += radiance;
     }
@@ -147,6 +147,8 @@ fn fragmentSlices(vertexOut: VertexOutput) -> @location(0) vec4f {
       
   }
     return vec4(finalColor, 1.0 - transmission);
+
+
 }
 
  

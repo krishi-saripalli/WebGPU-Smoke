@@ -1,3 +1,5 @@
+// textureSampleLevel instead of textureSample bc its not allowed in compute shaders
+// https://github.com/gpuweb/gpuweb/discussions/4814
 @import "common.wgsl";
 
 @group(1) @binding(0) var velocityIn: texture_3d<min16float>;
@@ -27,7 +29,7 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
   let density = textureSampleLevel(densityIn, texSampler, coord_normalized, 0.0).x;
   let temperature = textureSampleLevel(temperatureIn, texSampler, coord_normalized, 0.0).x;
 
-  let dissipation = 0.999;
+  let dissipation = 1.0;
   textureStore(velocityOut, id, vec4f(velocity_adv * dissipation, 0.0));
   textureStore(densityOut, id, vec4f(density * dissipation, 0.0, 0.0, 0.0));
   textureStore(temperatureOut, id, vec4f(temperature * dissipation, 0.0, 0.0, 0.0));

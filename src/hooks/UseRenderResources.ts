@@ -110,7 +110,7 @@ export const useRenderResources = (
           cameraForward: camera.getForward(),
           cameraPos: camera.getPosition(),
           lightPosition: [0.0, 0.9, 0.0],
-          lightIntensity: [0.0, 80.0, 80.0],
+          lightIntensity: [232 / 7, 209 / 7, 144 / 7],
           ratio: [1.0, 1.0, 1.0],
           absorption: 0.4,
           lightPosition2: [0.0, 0.9, 0.0],

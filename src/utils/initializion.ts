@@ -68,7 +68,7 @@ const _initializeTemperature = (
       internalZ >= centerZ - radius &&
       internalZ <= centerZ + radius
     ) {
-      return 300.0; // hot!!;
+      return 10000.0; // hot!!;
     }
     return 0.0; //ambient temp
   }

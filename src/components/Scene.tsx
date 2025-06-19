@@ -284,7 +284,7 @@ const renderScene = (
       {
         view: multisampleTexture.createView(),
         resolveTarget: context.getCurrentTexture().createView(),
-        clearValue: { r: 0.3945, g: 0.457, b: 0.4531, a: 1 },
+        clearValue: { r: 0.05, g: 0.0, b: 0.0, a: 1 },
         loadOp: 'clear',
         storeOp: 'store',
       },

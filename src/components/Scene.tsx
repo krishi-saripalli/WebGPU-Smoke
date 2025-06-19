@@ -275,9 +275,6 @@ const renderScene = (
   swapTextures('velocity');
   swapTextures('temperature');
 
-  /////////////////////////////////////////////////////////////////////////
-  // Render pass
-  /////////////////////////////////////////////////////////////////////////
   const renderEncoder = device.createCommandEncoder({ label: 'Render Encoder' });
   const renderPassDescriptor: GPURenderPassDescriptor = {
     colorAttachments: [
@@ -332,6 +329,9 @@ export const WebGPUCanvas = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [prevMousePos, setPrevMousePos] = useState<{ x: number; y: number } | null>(null);
 
+  const [cameraChanged, setCameraChanged] = useState(true);
+  const cameraChangedRef = useRef(true);
+
   const viewMatrixDef = makeShaderDataDefinitions(`
     struct ViewMatrixUpdate {
       viewMatrix: mat4x4<f32>,
@@ -371,6 +371,10 @@ export const WebGPUCanvas = () => {
     pressedKeysRef.current = pressedKeys;
   }, [pressedKeys]);
 
+  useEffect(() => {
+    cameraChangedRef.current = cameraChanged;
+  }, [cameraChanged]);
+
   const keyDownHandler = useCallback((e: KeyboardEvent) => {
     handleKeyDown(e, setPressedKeys);
   }, []);
@@ -406,73 +410,43 @@ export const WebGPUCanvas = () => {
         startTime = currentTime;
       }
 
-      const elapsedTime = (currentTime - startTime) / 1000.0;
-
-      updateCameraPosition(renderResources.camera, pressedKeysRef.current);
-
-      viewMatrixView.set({
-        viewMatrix: renderResources.camera.getViewMatrix(),
-      });
-      cameraForwardView.set({
-        cameraForward: renderResources.camera.getForward(),
-      });
-
-      const radius = 1.0;
-      const rotationSpeed = 0.6;
-
-      const t = elapsedTime * rotationSpeed;
-
-      const lightX = radius * Math.cos(t);
-      const lightY = radius * Math.sin(t);
-      const lightZ = -0.5;
-
-      lightPositionView.set({
-        lightPosition: [lightX, lightY, lightZ],
-      });
-
-      const light2X = radius * Math.cos(-t);
-      const light2Y = 0.0;
-      const light2Z = radius * Math.sin(-t);
-
-      lightPosition2View.set({
-        lightPosition2: [light2X, light2Y, light2Z],
-      });
-
-      cameraPosView.set({
-        cameraPos: renderResources.camera.getPosition(),
-      });
-
-      // viewMatrix is at offset 0, cameraForward is at offset 16*4 + 16*4 + 3*4 + 4 = 148 bytes
-      webGPUState.device.queue.writeBuffer(
-        renderResources.uniformBuffer,
-        0, // viewMatrix offset
-        viewMatrixView.arrayBuffer
-      );
-      webGPUState.device.queue.writeBuffer(
-        renderResources.uniformBuffer,
-        148, // cameraForward offset (after viewMatrix + projMatrix + gridSize + pad1)
-        cameraForwardView.arrayBuffer
+      const cameraPositionChanged = updateCameraPosition(
+        renderResources.camera,
+        pressedKeysRef.current
       );
 
-      webGPUState.device.queue.writeBuffer(
-        renderResources.uniformBuffer,
-        176, // lightPosition offset
-        lightPositionView.arrayBuffer
-      );
+      if (cameraChangedRef.current || cameraPositionChanged) {
+        viewMatrixView.set({
+          viewMatrix: renderResources.camera.getViewMatrix(),
+        });
+        cameraForwardView.set({
+          cameraForward: renderResources.camera.getForward(),
+        });
+        cameraPosView.set({
+          cameraPos: renderResources.camera.getPosition(),
+        });
 
-      // lightPosition2 offset calculation:
-      // lightPosition(176) + vec3<f32>(12) + _pad3(4) + lightIntensity(12) + _pad4(4) + ratio(12) + _pad5(4) = 224
-      // webGPUState.device.queue.writeBuffer(
-      //   renderResources.uniformBuffer,
-      //   224, // lightPosition2 offset
-      //   lightPosition2View.arrayBuffer
-      // );
+        // viewMatrix at offset 0 (64 bytes), cameraForward is at offset 148 (12 bytes), cameraPos is at offset 160 (12 bytes)
+        webGPUState.device.queue.writeBuffer(
+          renderResources.uniformBuffer,
+          0, // viewMatrix offset
+          viewMatrixView.arrayBuffer
+        );
 
-      webGPUState.device.queue.writeBuffer(
-        renderResources.uniformBuffer,
-        160, // cameraPos offset
-        cameraPosView.arrayBuffer
-      );
+        webGPUState.device.queue.writeBuffer(
+          renderResources.uniformBuffer,
+          148,
+          cameraForwardView.arrayBuffer
+        );
+        webGPUState.device.queue.writeBuffer(
+          renderResources.uniformBuffer,
+          160,
+          cameraPosView.arrayBuffer
+        );
+
+        setCameraChanged(false);
+        cameraChangedRef.current = false;
+      }
 
       renderScene(webGPUState, renderResources, min16floatStorage);
 
@@ -512,37 +486,9 @@ export const WebGPUCanvas = () => {
       );
 
       if (cameraUpdated) {
-        // update uniform buffer if camera rotation changed using webgpu-utils
-        viewMatrixView.set({
-          viewMatrix: renderResources.camera.getViewMatrix(),
-        });
-        cameraForwardView.set({
-          cameraForward: renderResources.camera.getForward(),
-        });
-
-        cameraPosView.set({
-          cameraPos: renderResources.camera.getPosition(),
-        });
-
-        // Write to specific offsets in the uniform buffer
-        webGPUState.device.queue.writeBuffer(
-          renderResources.uniformBuffer,
-          0, // viewMatrix offset
-          viewMatrixView.arrayBuffer
-        );
-        webGPUState.device.queue.writeBuffer(
-          renderResources.uniformBuffer,
-          148, // cameraForward offset
-          cameraForwardView.arrayBuffer
-        );
-
-        webGPUState.device.queue.writeBuffer(
-          renderResources.uniformBuffer,
-          160, // cameraPos offset
-          cameraPosView.arrayBuffer
-        );
-
-        renderScene(webGPUState, renderResources, min16floatStorage);
+        // Set flag to update uniforms in the next animation frame
+        setCameraChanged(true);
+        cameraChangedRef.current = true;
       }
     },
     [

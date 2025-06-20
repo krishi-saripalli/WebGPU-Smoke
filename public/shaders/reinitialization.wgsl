@@ -61,9 +61,9 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
 
       let source_centerX = uniforms.gridSize.x / 2;
       let source_centerZ = uniforms.gridSize.z / 2;
-      let radius = 10u;
+      let radius = 7u;
       let heatHeight = uniforms.gridSize.y / 2; 
-      let densityHeight = 1u;        
+      let densityHeight = 3u;        
 
       if (
         internalY <= heatHeight &&

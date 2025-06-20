@@ -27,7 +27,6 @@ import {
   handleMouseMove,
   handleMouseUp,
 } from '@/utils/input-handler';
-import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
 import {
   createDivergenceCalculationBindGroupLayout,
   createExternalForcesStepBindGroupLayout,
@@ -281,7 +280,7 @@ const renderScene = (
       {
         view: multisampleTexture.createView(),
         resolveTarget: context.getCurrentTexture().createView(),
-        clearValue: { r: 0.05, g: 0.0, b: 0.0, a: 1 },
+        clearValue: { r: 0.8705, g: 0.7764, b: 0.5137, a: 1.0 },
         loadOp: 'clear',
         storeOp: 'store',
       },
@@ -332,34 +331,6 @@ export const WebGPUCanvas = () => {
   const [cameraChanged, setCameraChanged] = useState(true);
   const cameraChangedRef = useRef(true);
 
-  const viewMatrixDef = makeShaderDataDefinitions(`
-    struct ViewMatrixUpdate {
-      viewMatrix: mat4x4<f32>,
-    };
-  `);
-  const viewMatrixView = makeStructuredView(viewMatrixDef.structs.ViewMatrixUpdate);
-
-  const cameraForwardDef = makeShaderDataDefinitions(`
-    struct CameraForwardUpdate {
-      cameraForward: vec3<f32>,
-    };
-  `);
-  const cameraForwardView = makeStructuredView(cameraForwardDef.structs.CameraForwardUpdate);
-
-  const lightPositionDef = makeShaderDataDefinitions(`
-    struct LightPositionUpdate {
-      lightPosition: vec3<f32>,
-    };
-  `);
-  const lightPositionView = makeStructuredView(lightPositionDef.structs.LightPositionUpdate);
-
-  const cameraPosDef = makeShaderDataDefinitions(`
-    struct CameraPosUpdate {
-      cameraPos: vec3<f32>,
-    };
-  `);
-  const cameraPosView = makeStructuredView(cameraPosDef.structs.CameraPosUpdate);
-
   useEffect(() => {
     pressedKeysRef.current = pressedKeys;
   }, [pressedKeys]);
@@ -409,32 +380,24 @@ export const WebGPUCanvas = () => {
       );
 
       if (cameraChangedRef.current || cameraPositionChanged) {
-        viewMatrixView.set({
+        // Update the shared uniformsView with all uniform data
+        renderResources.uniformsView.set({
           viewMatrix: renderResources.camera.getViewMatrix(),
-        });
-        cameraForwardView.set({
+          projectionMatrix: renderResources.camera.getProjectionMatrix(),
+          gridSize: renderResources.uniformConstants.gridSize,
           cameraForward: renderResources.camera.getForward(),
-        });
-        cameraPosView.set({
           cameraPos: renderResources.camera.getPosition(),
+          lightPosition: renderResources.uniformConstants.lightPosition,
+          lightIntensity: renderResources.uniformConstants.lightIntensity,
+          ratio: renderResources.uniformConstants.ratio,
+          absorption: renderResources.uniformConstants.absorption,
+          scattering: renderResources.uniformConstants.scattering,
         });
 
-        // viewMatrix at offset 0 (64 bytes), cameraForward is at offset 148 (12 bytes), cameraPos is at offset 160 (12 bytes)
         webGPUState.device.queue.writeBuffer(
           renderResources.uniformBuffer,
-          0, // viewMatrix offset
-          viewMatrixView.arrayBuffer
-        );
-
-        webGPUState.device.queue.writeBuffer(
-          renderResources.uniformBuffer,
-          148,
-          cameraForwardView.arrayBuffer
-        );
-        webGPUState.device.queue.writeBuffer(
-          renderResources.uniformBuffer,
-          160,
-          cameraPosView.arrayBuffer
+          0,
+          renderResources.uniformsView.arrayBuffer
         );
 
         setCameraChanged(false);

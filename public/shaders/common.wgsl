@@ -16,7 +16,9 @@ struct Uniforms {
     lightIntensity  : vec3<f32>,    // color and strength of the light
     _pad4           : f32,          
     ratio           : vec3<f32>,    // aspect ratio of simulation grid
-    _pad5           : f32,          
+    _pad5           : f32,
+    scattering      : f32,          // scattering coefficient
+    _pad6           : vec3<f32>,
          
 };
 @group(0) @binding(0)

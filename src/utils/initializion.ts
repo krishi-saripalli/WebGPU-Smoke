@@ -59,7 +59,7 @@ const _initializeTemperature = (
     const centerX = gridSize / 2;
     const centerZ = gridSize / 2;
     const radius = 10;
-    const height = gridSize / 2;
+    const height = gridSize / 3;
 
     if (
       internalY <= height &&

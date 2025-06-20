@@ -48,6 +48,15 @@ export interface RenderPipelineResources {
   vorticityTextureB: GPUTexture;
   vorticityForceTextureA: GPUTexture;
   vorticityForceTextureB: GPUTexture;
+  uniformsView: any;
+  uniformConstants: {
+    gridSize: [number, number, number];
+    lightPosition: [number, number, number];
+    lightIntensity: [number, number, number];
+    ratio: [number, number, number];
+    absorption: number;
+    scattering: number;
+  };
 }
 
 const commonShaderCode = await loadShader(SHADER_PATHS.common);
@@ -94,25 +103,35 @@ export const useRenderResources = (
         });
 
         const camera = new Camera({
-          position: new Vec3([0, 0, 2.0]),
-          forward: new Vec3([0, 0, -1]),
+          position: new Vec3([-3.0, 0, 1.0]),
+          forward: new Vec3([1, 0, -1]),
           up: new Vec3([0, 1, 0]),
           heightAngle: Math.PI / 2,
           near: 0.1,
           far: 100,
           aspect: 1,
         });
+        const viewMatrix = camera.getViewMatrix() as Float32Array;
+        const projectionMatrix = camera.getProjectionMatrix() as Float32Array;
+        const cameraForward = camera.getForward() as Float32Array;
+        const cameraPos = camera.getPosition() as Float32Array;
+        const lightPosition: [number, number, number] = [-0.5, 0.8, 0.0];
+        const lightIntensity: [number, number, number] = [3 * 4.0, 3 * 3.5, 3 * 3.0];
+        const ratio: [number, number, number] = [1.0, 1.0, 1.0];
+        const absorption: number = 4.0;
+        const scattering: number = 5.0;
 
         uniformsView.set({
-          viewMatrix: camera.getViewMatrix() as unknown as Float32Array,
-          projectionMatrix: camera.getProjectionMatrix() as unknown as Float32Array,
+          viewMatrix: viewMatrix,
+          projectionMatrix: projectionMatrix,
           gridSize: [internalGridSize, internalGridSize, internalGridSize],
-          cameraForward: camera.getForward(),
-          cameraPos: camera.getPosition(),
-          lightPosition: [0.0, 0.9, 0.0],
-          lightIntensity: [232, 209, 144],
-          ratio: [1.0, 1.0, 1.0],
-          absorption: 0.1,
+          cameraForward: cameraForward,
+          cameraPos: cameraPos,
+          lightPosition: lightPosition,
+          lightIntensity: lightIntensity,
+          ratio: ratio,
+          absorption: absorption,
+          scattering: scattering,
         });
 
         device.queue.writeBuffer(uniformBuffer, 0, uniformsView.arrayBuffer);
@@ -127,9 +146,9 @@ export const useRenderResources = (
         simulationParamsView.set({
           dt: 0.01,
           dx: 1.0 / internalGridSize,
-          vorticityStrength: 4.7,
+          vorticityStrength: 8.0,
           buoyancyAlpha: 9.8,
-          buoyancyBeta: 15.0,
+          buoyancyBeta: 23.0,
           ambientTemperature: 0.0,
         });
 
@@ -645,6 +664,15 @@ export const useRenderResources = (
           vorticityTextureB,
           vorticityForceTextureA,
           vorticityForceTextureB,
+          uniformsView,
+          uniformConstants: {
+            gridSize: [internalGridSize, internalGridSize, internalGridSize],
+            lightPosition: lightPosition,
+            lightIntensity: lightIntensity,
+            ratio: ratio,
+            absorption: absorption,
+            scattering: scattering,
+          },
         });
       } catch (e) {
         const error = e instanceof Error ? e : new Error(String(e));

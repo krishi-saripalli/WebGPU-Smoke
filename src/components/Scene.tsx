@@ -305,11 +305,11 @@ const renderScene = (
   renderPass.drawIndexed(slicesIndexCount);
 
   // // wireframe
-  // renderPass.setPipeline(wireframePipeline);
-  // renderPass.setBindGroup(0, uniformBindGroup);
-  // renderPass.setVertexBuffer(0, wireframeVertexBuffer);
-  // renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
-  // renderPass.drawIndexed(wireframeIndexCount);
+  renderPass.setPipeline(wireframePipeline);
+  renderPass.setBindGroup(0, uniformBindGroup);
+  renderPass.setVertexBuffer(0, wireframeVertexBuffer);
+  renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
+  renderPass.drawIndexed(wireframeIndexCount);
 
   renderPass.end();
   device.queue.submit([renderEncoder.finish()]);
@@ -352,13 +352,6 @@ export const WebGPUCanvas = () => {
     };
   `);
   const lightPositionView = makeStructuredView(lightPositionDef.structs.LightPositionUpdate);
-
-  const lightPosition2Def = makeShaderDataDefinitions(`
-    struct LightPosition2Update {
-      lightPosition2: vec3<f32>,
-    };
-  `);
-  const lightPosition2View = makeStructuredView(lightPosition2Def.structs.LightPosition2Update);
 
   const cameraPosDef = makeShaderDataDefinitions(`
     struct CameraPosUpdate {
@@ -491,18 +484,7 @@ export const WebGPUCanvas = () => {
         cameraChangedRef.current = true;
       }
     },
-    [
-      isDragging,
-      prevMousePos,
-      renderResources,
-      webGPUState,
-      min16floatStorage,
-      viewMatrixView,
-      cameraForwardView,
-      cameraPosView,
-      lightPositionView,
-      lightPosition2View,
-    ]
+    [isDragging, prevMousePos, renderResources, webGPUState?.device]
   );
 
   return (

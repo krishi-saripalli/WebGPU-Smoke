@@ -68,7 +68,7 @@ fn inScattering(currentPosition : vec3f, lightPos: vec3f) -> f32 {
   var totalDensity = 0.0;
 
 
-  for (var i : u32 = 0; i < numSteps; i++) {
+  for (var i : u32 = 1; i < numSteps; i++) {
     let t = f32(i) * stepSize;
     let secondaryPosition = currentPosition + directionToLight * t;
     let texCoord = (secondaryPosition + vec3f(1.0)) * 0.5;
@@ -83,17 +83,12 @@ fn radiance(currentPosition: vec3f, rayDirection: vec3f, density: f32, stepSize:
   
   if (density > 0.01) {
     let positionToLight1 = uniforms.lightPosition - currentPosition;
-    let attenuation1 = inScattering(currentPosition, uniforms.lightPosition);
-    let cosTheta1 = dot(normalize(-rayDirection), normalize(positionToLight1));
+    let attenuation = inScattering(currentPosition, uniforms.lightPosition);
+    let cosTheta = dot(normalize(-rayDirection), normalize(positionToLight1));
     
-    radiance += uniforms.lightIntensity * attenuation1 * phase(cosTheta1, 0.1) * transmission * stepSize * density ;
+    radiance += uniforms.lightIntensity * attenuation * transmission * stepSize * density * phase(cosTheta,0.5) ;
     
-    // TODO: Make this less expensive somehow
-    // let positionToLight2 = uniforms.lightPosition2 - currentPosition;
-    // let attenuation2 = inScattering(currentPosition, uniforms.lightPosition2);
-    // let cosTheta2 = dot(normalize(-rayDirection), normalize(positionToLight2));
-    // let falloff2 = 1.0 / (1.0 + dot(positionToLight2,positionToLight2));
-    // radiance += uniforms.lightIntensity2 * falloff2 * attenuation2 * phase(cosTheta2, 0.5) * scattering * transmission * stepSize * density;
+
   }
   
   return radiance;

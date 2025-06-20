@@ -29,7 +29,7 @@ const _initializeDensity = (
       internalZ >= centerZ - radius &&
       internalZ <= centerZ + radius
     ) {
-      return 0.7;
+      return 1.0;
     }
     return 0.0;
   }
@@ -68,7 +68,7 @@ const _initializeTemperature = (
       internalZ >= centerZ - radius &&
       internalZ <= centerZ + radius
     ) {
-      return 10000.0; // hot!!;
+      return 1000.0; // hot!!;
     }
     return 0.0; //ambient temp
   }

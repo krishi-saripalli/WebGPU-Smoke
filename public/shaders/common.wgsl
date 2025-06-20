@@ -17,10 +17,7 @@ struct Uniforms {
     _pad4           : f32,          
     ratio           : vec3<f32>,    // aspect ratio of simulation grid
     _pad5           : f32,          
-    lightPosition2  : vec3<f32>,    // world space position of the second light source
-    _pad6           : f32,          
-    lightIntensity2 : vec3<f32>,    // color and strength of the second light
-    _pad7           : f32           
+         
 };
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;

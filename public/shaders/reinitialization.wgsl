@@ -62,7 +62,7 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
       let source_centerX = uniforms.gridSize.x / 2;
       let source_centerZ = uniforms.gridSize.z / 2;
       let radius = 10u;
-      let heatHeight = uniforms.gridSize.y / 4; 
+      let heatHeight = uniforms.gridSize.y / 2; 
       let densityHeight = 1u;        
 
       if (
@@ -72,7 +72,7 @@ fn main(@builtin(global_invocation_id) id : vec3<u32>) {
         internalZ >= source_centerZ - radius &&
         internalZ <= source_centerZ + radius
       ) {
-        temperature = params.ambientTemperature + 300.0;
+        temperature = params.ambientTemperature + 100.0;
 
         if (internalY <= densityHeight) { 
           density = 1.0;

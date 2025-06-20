@@ -110,11 +110,9 @@ export const useRenderResources = (
           cameraForward: camera.getForward(),
           cameraPos: camera.getPosition(),
           lightPosition: [0.0, 0.9, 0.0],
-          lightIntensity: [232 / 7, 209 / 7, 144 / 7],
+          lightIntensity: [232, 209, 144],
           ratio: [1.0, 1.0, 1.0],
-          absorption: 0.4,
-          lightPosition2: [0.0, 0.9, 0.0],
-          lightIntensity2: [80.0, 20.0, 8.0],
+          absorption: 0.1,
         });
 
         device.queue.writeBuffer(uniformBuffer, 0, uniformsView.arrayBuffer);
@@ -129,7 +127,7 @@ export const useRenderResources = (
         simulationParamsView.set({
           dt: 0.01,
           dx: 1.0 / internalGridSize,
-          vorticityStrength: 10.0,
+          vorticityStrength: 4.7,
           buoyancyAlpha: 9.8,
           buoyancyBeta: 15.0,
           ambientTemperature: 0.0,

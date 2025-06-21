@@ -304,11 +304,11 @@ const renderScene = (
   renderPass.drawIndexed(slicesIndexCount);
 
   // // wireframe
-  renderPass.setPipeline(wireframePipeline);
-  renderPass.setBindGroup(0, uniformBindGroup);
-  renderPass.setVertexBuffer(0, wireframeVertexBuffer);
-  renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
-  renderPass.drawIndexed(wireframeIndexCount);
+  // renderPass.setPipeline(wireframePipeline);
+  // renderPass.setBindGroup(0, uniformBindGroup);
+  // renderPass.setVertexBuffer(0, wireframeVertexBuffer);
+  // renderPass.setIndexBuffer(wireframeIndexBuffer, 'uint32');
+  // renderPass.drawIndexed(wireframeIndexCount);
 
   renderPass.end();
   device.queue.submit([renderEncoder.finish()]);

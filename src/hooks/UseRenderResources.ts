@@ -103,7 +103,7 @@ export const useRenderResources = (
         });
 
         const camera = new Camera({
-          position: new Vec3([-3.0, 0, 1.0]),
+          position: new Vec3([-1.5, 0, 1.5]),
           forward: new Vec3([1, 0, -1]),
           up: new Vec3([0, 1, 0]),
           heightAngle: Math.PI / 2,

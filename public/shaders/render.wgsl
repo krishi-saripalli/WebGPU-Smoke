@@ -61,7 +61,7 @@ fn phase(cosTheta: f32, g: f32) -> f32 {
 //returns the light attenuation coefficient by sampling point between the primary sample and light position
 fn inScattering(currentPosition : vec3f, lightPos: vec3f) -> f32 {
   let directionToLight = normalize(lightPos - currentPosition);
-  let numSteps = 8u;
+  let numSteps = 16u;
   let rayLength = length(lightPos - currentPosition);
   let stepSize = rayLength / f32(numSteps);
   var totalDensity = 0.0;
@@ -86,7 +86,7 @@ fn radiance(currentPosition: vec3f, rayDirection: vec3f, density: f32, stepSize:
     let cosTheta = dot(normalize(-rayDirection), normalize(positionToLight));
     
     let scatteringContribution = uniforms.scattering * density;
-    let phase = phase(cosTheta, 0.1);
+    let phase = phase(cosTheta, 0.01);
     radiance += uniforms.lightIntensity * attenuation * transmission * stepSize * scatteringContribution * phase;
     
   }

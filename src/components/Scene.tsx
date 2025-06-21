@@ -455,7 +455,9 @@ export const WebGPUCanvas = () => {
   return (
     <div>
       {error && (
-        <div className="text-white text-center justify-center items-center text-3xl">Error: {error}</div>
+        <div className="text-white text-center justify-center items-center text-3xl">
+          Error: {error}
+        </div>
       )}
       <canvas
         ref={canvasRef}

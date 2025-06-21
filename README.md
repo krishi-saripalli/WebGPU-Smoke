@@ -1,49 +1,25 @@
-# Primary Quantities
+# WebGPU-Smoke
 
-## Velocity (u) - Vector field
-- 3D vector at each voxel face (staggered grid)
-- Components: u, v, w for x, y, z directions
-- Updated each frame through force addition, advection, and projection
+![](public/images/smoke.gif)
 
-## Pressure (p) - Scalar field
-- Single scalar value at each voxel center
-- Solved for at each time step (not stored between frames)
-- Used only to make the velocity field incompressible
+A grid-based fluid solver mostly based on the paper (Visual Simulation of Smoke (Fedkiw et. al 2001))[https://web.stanford.edu/class/cs237d/smoke.pdf]
 
-## Density (ρ) - Scalar field
-- Single scalar value at each voxel center
-- Represents the amount of smoke at each point
-- Advected by the velocity field
+## Running
 
-## Temperature (T) - Scalar field
-- Single scalar value at each voxel center
-- Affects buoyancy (hot smoke rises)
-- Advected by the velocity field
+To run the app, you'll need a WebGPU compatible browser. If you're not sure whether you have one, check (here)[https://caniuse.com/webgpu]. You'll also need a device that supports the `float32-filterable` which allows filtered sampling of texture values for linear interpolation. Unfortunately, that means that most mobile devices cannot run the app for now.
 
-# Derived Quantities
+First, install dependencies
 
-## Vorticity (ω) - Vector field
-- 3D vector at each voxel center
-- Computed from the velocity field (curl of velocity)
-- Used for vorticity confinement force
+```
+pnpm i
+```
 
-## Vorticity Confinement Force - Vector field
-- 3D vector at each voxel center
-- Computed from vorticity
-- Added to velocity to counter numerical dissipation
+Then, run
 
-## Buoyancy Force - Vector field
-- 3D vector at each voxel center
-- Computed from temperature and density
-- Added to velocity to make hot smoke rise
+```
+pnpm run dev
+```
 
-# For Rendering (Hardware Renderer)
+## TODO
 
-## Light Intensity - Scalar field
-- Single scalar value at each voxel center
-- Computed using line drawing algorithm through the density field
-- Represents direct lighting at each voxel
-
-## Voxel Transparency - Scalar field
-- Computed from density
-- Used during rendering phase
+- Get `shader-f16` working for better memory bandwidth

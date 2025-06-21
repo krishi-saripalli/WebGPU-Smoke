@@ -2,7 +2,7 @@ import { Vec3, Mat4, vec3 } from 'gl-matrix';
 
 export interface CameraData {
   position: Vec3;
-  forward: Vec3;  // Changed from lookAt to forward
+  forward: Vec3;
   up: Vec3;
   heightAngle: number;
   near: number;
@@ -29,20 +29,16 @@ export class Camera {
     this.far = cameraData.far;
     this.aspect = cameraData.aspect;
 
-    // Initialize right vector
     this.right = vec3.create();
     this.updateVectors();
   }
 
   private updateVectors(): void {
-    // Normalize forward vector
     vec3.normalize(this.forward, this.forward);
 
-    // Calculate right vector
     vec3.cross(this.right, this.forward, this.up);
     vec3.normalize(this.right, this.right);
 
-    // Recalculate up vector to ensure orthogonality
     vec3.cross(this.up, this.right, this.forward);
     vec3.normalize(this.up, this.up);
   }
@@ -73,11 +69,9 @@ export class Camera {
     const scaleY = 1.0 / Math.tan(this.heightAngle / 2.0);
     const scaleX = scaleY / this.aspect;
     
-    // Calculate depth range factors for WebGPU's [0,1] range
-    // but maintaining right-handed convention (-Z forward)
+    
     const rangeInv = 1.0 / (this.far - this.near);
     
-    // Build right-handed perspective matrix for WebGPU depth range
     const matrix = Mat4.fromValues(
       scaleX, 0.0,    0.0,    0.0,
       0.0,    scaleY, 0.0,    0.0,
@@ -104,20 +98,14 @@ export class Camera {
     Mat4.multiply(combinedRotation, rotationY, rotationX);
 
     vec3.transformMat4(this.forward, this.forward, combinedRotation);
-    vec3.normalize(this.forward, this.forward);
-
-    vec3.transformMat4(this.up, this.up, combinedRotation);
-    vec3.normalize(this.up, this.up);
-
-    vec3.cross(this.right, this.forward, this.up);
-    vec3.normalize(this.right, this.right);
+    
+    this.updateVectors();
   }
 
   updateAspect(width: number, height: number): void {
     this.aspect = width / height;
   }
 
-  // Getter methods
   getPosition(): Vec3 {
     return this.position;
   }

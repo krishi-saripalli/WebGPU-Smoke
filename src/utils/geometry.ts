@@ -27,23 +27,6 @@ function addQuad(
   );
 }
 
-export function generateSlices(gridSize: number) {
-  /////////////////////////////////////////////////////////////////////////
-  // Evenly space the points from -1 to +1 in (gridSize) steps
-  /////////////////////////////////////////////////////////////////////////
-
-  const vertexPositions: number[] = [];
-  const indicesList: number[] = [];
-
-  for (let idx = 0; idx <= gridSize + 1; idx++) {
-    const z = -1.0 + idx * (2.0 / gridSize);
-    addQuad(vertexPositions, indicesList, [-1, -1, z], [1, -1, z], [-1, 1, z], [1, 1, z]);
-  }
-  //TODO: Add the dynamic axis-aligned slices to support camera movement
-
-  return { vertexPositions, indicesList };
-}
-
 export function generateBox() {
   const vertexPositions: number[] = [];
   const indicesList: number[] = [];

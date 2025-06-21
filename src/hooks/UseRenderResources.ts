@@ -3,7 +3,7 @@ import { WebGPUState } from './useWebGPU';
 import { Camera } from '@/modules/Camera';
 import { Vec3 } from 'gl-matrix';
 import { loadShader, loadShaderModules } from '@/utils/shader-loader';
-import { generateBox, generateSlices, generateWireframe } from '@/utils/geometry';
+import { generateBox, generateWireframe } from '@/utils/geometry';
 import { initializeSimulationData } from '@/utils/initializion';
 import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
 import * as layouts from '@/utils/layouts';
@@ -147,8 +147,8 @@ export const useRenderResources = (
           dt: 0.01,
           dx: 1.0 / internalGridSize,
           vorticityStrength: 8.0,
-          buoyancyAlpha: 9.8,
-          buoyancyBeta: 23.0,
+          buoyancyAlpha: 19.8,
+          buoyancyBeta: 33.0,
           ambientTemperature: 0.0,
         });
 

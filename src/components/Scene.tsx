@@ -104,7 +104,6 @@ const renderScene = (
     Math.ceil(totalGridSize / workgroupSize[2]),
   ];
 
-  //TODO: Different behaviour for even and odd number of iterations?
   const JACOBI_ITERATIONS = 30;
 
   const swapTextures = (resource: keyof SimulationState) => {
@@ -318,11 +317,14 @@ export const WebGPUCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const {
     state: webGPUState,
+    error,
     header,
     min16float,
     min16floatStorage,
   } = useWebGPU(canvasRef as React.RefObject<HTMLCanvasElement>);
+
   const renderResources = useRenderResources(webGPUState, header, min16float, min16floatStorage);
+
   const [pressedKeys, setPressedKeys] = useState(new Set<string>());
   const pressedKeysRef = useRef(new Set<string>());
   const [isDragging, setIsDragging] = useState(false);
@@ -452,6 +454,9 @@ export const WebGPUCanvas = () => {
 
   return (
     <div>
+      {error && (
+        <div className="text-white text-center justify-center items-center text-3xl">Error: {error}</div>
+      )}
       <canvas
         ref={canvasRef}
         width={1028}

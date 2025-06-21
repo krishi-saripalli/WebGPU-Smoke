@@ -1,8 +1,8 @@
 # WebGPU-Smoke
 
-![](public/images/smoke.gif)
+![](public/media/smoke-trimmed.mov)
 
-A grid-based fluid solver mostly based on the paper (Visual Simulation of Smoke (Fedkiw et. al 2001))[https://web.stanford.edu/class/cs237d/smoke.pdf]
+A grid-based fluid solver mostly based on the paper (Visual Simulation of Smoke (Fedkiw et. al 2001))[https://web.stanford.edu/class/cs237d/smoke.pdf] and (Simulating Fluids, Fire, and Smoke in Real-Time (Chan 2023))[https://andrewkchan.dev/posts/fire.html]
 
 ## Running
 
@@ -21,5 +21,5 @@ pnpm run dev
 ```
 
 ## TODO
-
 - Get `shader-f16` working for better memory bandwidth
+- Pre-baked radiance texture for more efficient lighting

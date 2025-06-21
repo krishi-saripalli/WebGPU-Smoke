@@ -1,8 +1,6 @@
 # WebGPU-Smoke
 
-<video src="public/media/smoke-trimmed.mp4" controls width="100%">
-  Your browser does not support the video tag.
-</video>
+![](public/media/smoke.png)
 
 A grid-based fluid solver mostly based on the paper [Visual Simulation of Smoke (Fedkiw et. al 2001)](https://web.stanford.edu/class/cs237d/smoke.pdf) and [Simulating Fluids, Fire, and Smoke in Real-Time (Chan 2023)](https://andrewkchan.dev/posts/fire.html)
 

@@ -6,7 +6,7 @@ A grid-based fluid solver mostly based on the paper [Visual Simulation of Smoke 
 
 ## Running
 
-To run the app, you'll need a WebGPU compatible browser. If you're not sure whether you have one, check [here](https://caniuse.com/webgpu). You'll also need a device that supports the `float32-filterable` which allows filtered sampling of texture values for linear interpolation. Unfortunately, that means that most mobile devices cannot run the app for now.
+To run the app, you'll need a WebGPU compatible browser. If you're not sure whether you have one, check [here](https://caniuse.com/webgpu). You'll also need a device that supports the `float32-filterable` feature which allows filtered sampling of texture values for linear interpolation. Unfortunately, that means that most mobile devices cannot run the app for now.
 
 First, install dependencies
 

@@ -27,18 +27,6 @@ import {
   handleMouseMove,
   handleMouseUp,
 } from '@/utils/input-handler';
-import {
-  createDivergenceCalculationBindGroupLayout,
-  createExternalForcesStepBindGroupLayout,
-  createPressureGradientSubtractionBindGroupLayout,
-  createPressureIterationBindGroupLayout,
-  createReinitializationBindGroupLayout,
-  createRenderBindGroupLayout,
-  createUniformBindGroupLayout,
-  createVorticityCalculationBindGroupLayout,
-  createVorticityConfinementBindGroupLayout,
-  createAdvectionBindGroupLayout,
-} from '@/utils/layouts';
 
 const renderScene = (
   webGPUState: WebGPUState,
@@ -114,7 +102,7 @@ const renderScene = (
 
   const uniformBindGroup = createUniformBindGroup(
     device,
-    createUniformBindGroupLayout(device),
+    renderResources.bindGroupLayouts.uniform,
     uniformBuffer,
     simulationParamsBuffer
   );
@@ -124,7 +112,7 @@ const renderScene = (
   advectPass.setPipeline(advectionPipeline);
   const advectBindGroup = createAdvectionBindGroup(
     device,
-    createAdvectionBindGroupLayout(device, min16floatStorage),
+    renderResources.bindGroupLayouts.advection,
     simulationState.velocity.current,
     simulationState.density.current,
     simulationState.temperature.current,
@@ -147,7 +135,7 @@ const renderScene = (
   forcesPass.setPipeline(externalForcesStepPipeline);
   const forcesBindGroup = createForcesBindGroup(
     device,
-    createExternalForcesStepBindGroupLayout(device),
+    renderResources.bindGroupLayouts.externalForces,
     simulationState.velocity.current,
     simulationState.temperature.current,
     simulationState.density.current,
@@ -165,7 +153,7 @@ const renderScene = (
   vorticityPass.setPipeline(vorticityCalculationPipeline);
   const vorticityBindGroup = createVorticityCalculationBindGroup(
     device,
-    createVorticityCalculationBindGroupLayout(device),
+    renderResources.bindGroupLayouts.vorticityCalculation,
     simulationState.velocity.current,
     simulationState.vorticity.next
   );
@@ -181,7 +169,7 @@ const renderScene = (
   confinementPass.setPipeline(vorticityConfinementPipeline);
   const confinementBindGroup = createVorticityConfinementBindGroup(
     device,
-    createVorticityConfinementBindGroupLayout(device),
+    renderResources.bindGroupLayouts.vorticityConfinement,
     simulationState.velocity.current,
     simulationState.vorticity.current,
     simulationState.velocity.next
@@ -198,7 +186,7 @@ const renderScene = (
   divergencePass.setPipeline(divergenceCalculationPipeline);
   const divergenceBindGroup = createDivergenceCalculationBindGroup(
     device,
-    createDivergenceCalculationBindGroupLayout(device, min16floatStorage),
+    renderResources.bindGroupLayouts.divergenceCalculation,
     simulationState.velocity.current,
     simulationState.divergence.next
   );
@@ -217,7 +205,7 @@ const renderScene = (
   for (let i = 0; i < JACOBI_ITERATIONS; i++) {
     const pressureBindGroup = createPressureIterationBindGroup(
       device,
-      createPressureIterationBindGroupLayout(device, min16floatStorage),
+      renderResources.bindGroupLayouts.pressureIteration,
       simulationState.divergence.current,
       simulationState.pressure.current,
       simulationState.pressure.next
@@ -236,7 +224,7 @@ const renderScene = (
   pressureGradPass.setBindGroup(0, uniformBindGroup);
   const pressureGradBindGroup = createPressureGradientSubtractionBindGroup(
     device,
-    createPressureGradientSubtractionBindGroupLayout(device),
+    renderResources.bindGroupLayouts.pressureGradientSubtraction,
     simulationState.pressure.current,
     simulationState.velocity.current,
     simulationState.velocity.next
@@ -257,7 +245,7 @@ const renderScene = (
   reinitializationPass.setBindGroup(0, uniformBindGroup);
   const reinitializationBindGroup = createReinitializationBindGroup(
     device,
-    createReinitializationBindGroupLayout(device, min16floatStorage),
+    renderResources.bindGroupLayouts.reinitialization,
     simulationState.temperature.current,
     simulationState.temperature.next,
     simulationState.density.current,
@@ -293,7 +281,7 @@ const renderScene = (
   renderPass.setPipeline(slicesPipeline);
   const renderBindGroup = createRenderBindGroup(
     device,
-    createRenderBindGroupLayout(device),
+    renderResources.bindGroupLayouts.render,
     simulationState.density.current,
     sampler
   );

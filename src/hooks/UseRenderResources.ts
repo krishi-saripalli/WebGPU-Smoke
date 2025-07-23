@@ -57,6 +57,18 @@ export interface RenderPipelineResources {
     absorption: number;
     scattering: number;
   };
+  bindGroupLayouts: {
+    uniform: GPUBindGroupLayout;
+    advection: GPUBindGroupLayout;
+    externalForces: GPUBindGroupLayout;
+    vorticityCalculation: GPUBindGroupLayout;
+    vorticityConfinement: GPUBindGroupLayout;
+    divergenceCalculation: GPUBindGroupLayout;
+    pressureIteration: GPUBindGroupLayout;
+    pressureGradientSubtraction: GPUBindGroupLayout;
+    reinitialization: GPUBindGroupLayout;
+    render: GPUBindGroupLayout;
+  };
 }
 
 const commonShaderCode = await loadShader(SHADER_PATHS.common);
@@ -402,7 +414,30 @@ export const useRenderResources = (
         );
 
         const uniformBindGroupLayout = layouts.createUniformBindGroupLayout(device);
-        const renderTexturesBindGroupLayout = layouts.createRenderBindGroupLayout(device);
+        const renderBindGroupLayout = layouts.createRenderBindGroupLayout(device);
+
+        const advectionBindGroupLayout = layouts.createAdvectionBindGroupLayout(
+          device,
+          min16floatStorage
+        );
+        const externalForcesBindGroupLayout =
+          layouts.createExternalForcesStepBindGroupLayout(device);
+        const vorticityCalculationBindGroupLayout =
+          layouts.createVorticityCalculationBindGroupLayout(device);
+        const vorticityConfinementBindGroupLayout =
+          layouts.createVorticityConfinementBindGroupLayout(device);
+        const divergenceCalculationBindGroupLayout =
+          layouts.createDivergenceCalculationBindGroupLayout(device, min16floatStorage);
+        const pressureIterationBindGroupLayout = layouts.createPressureIterationBindGroupLayout(
+          device,
+          min16floatStorage
+        );
+        const pressureGradientSubtractionBindGroupLayout =
+          layouts.createPressureGradientSubtractionBindGroupLayout(device);
+        const reinitializationBindGroupLayout = layouts.createReinitializationBindGroupLayout(
+          device,
+          min16floatStorage
+        );
 
         const sampler = device.createSampler({
           addressModeU: 'clamp-to-edge',
@@ -453,7 +488,7 @@ export const useRenderResources = (
           'label' | 'fragment' | 'depthStencil'
         > = {
           layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, renderTexturesBindGroupLayout],
+            bindGroupLayouts: [uniformBindGroupLayout, renderBindGroupLayout],
           }),
           vertex: {
             module: shaderModules[RENDER_ENTRY_POINTS.vertex.module],
@@ -503,10 +538,7 @@ export const useRenderResources = (
         });
 
         const externalForcesStepPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createExternalForcesStepBindGroupLayout(device),
-          ],
+          bindGroupLayouts: [uniformBindGroupLayout, externalForcesBindGroupLayout],
         });
         const externalForcesStepPipeline = createComputePipeline(
           device,
@@ -517,10 +549,7 @@ export const useRenderResources = (
         );
 
         const vorticityCalculationPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createVorticityCalculationBindGroupLayout(device),
-          ],
+          bindGroupLayouts: [uniformBindGroupLayout, vorticityCalculationBindGroupLayout],
         });
         const vorticityCalculationPipeline = createComputePipeline(
           device,
@@ -531,10 +560,7 @@ export const useRenderResources = (
         );
 
         const vorticityConfinementPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createVorticityConfinementBindGroupLayout(device),
-          ],
+          bindGroupLayouts: [uniformBindGroupLayout, vorticityConfinementBindGroupLayout],
         });
         const vorticityConfinementPipeline = createComputePipeline(
           device,
@@ -545,10 +571,7 @@ export const useRenderResources = (
         );
 
         const advectionPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createAdvectionBindGroupLayout(device, min16floatStorage),
-          ],
+          bindGroupLayouts: [uniformBindGroupLayout, advectionBindGroupLayout],
         });
         const advectionPipeline = createComputePipeline(
           device,
@@ -559,10 +582,7 @@ export const useRenderResources = (
         );
 
         const divergenceCalculationPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createDivergenceCalculationBindGroupLayout(device, min16floatStorage),
-          ],
+          bindGroupLayouts: [uniformBindGroupLayout, divergenceCalculationBindGroupLayout],
         });
         const divergenceCalculationPipeline = createComputePipeline(
           device,
@@ -573,10 +593,7 @@ export const useRenderResources = (
         );
 
         const pressureIterationPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createPressureIterationBindGroupLayout(device, min16floatStorage),
-          ],
+          bindGroupLayouts: [uniformBindGroupLayout, pressureIterationBindGroupLayout],
         });
         const pressureIterationPipeline = createComputePipeline(
           device,
@@ -587,10 +604,7 @@ export const useRenderResources = (
         );
 
         const pressureGradientSubtractionPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createPressureGradientSubtractionBindGroupLayout(device),
-          ],
+          bindGroupLayouts: [uniformBindGroupLayout, pressureGradientSubtractionBindGroupLayout],
         });
         const pressureGradientSubtractionPipeline = createComputePipeline(
           device,
@@ -601,10 +615,7 @@ export const useRenderResources = (
         );
 
         const reinitializationPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [
-            uniformBindGroupLayout,
-            layouts.createReinitializationBindGroupLayout(device, min16floatStorage),
-          ],
+          bindGroupLayouts: [uniformBindGroupLayout, reinitializationBindGroupLayout],
         });
 
         const reinitializationPipeline = createComputePipeline(
@@ -672,6 +683,18 @@ export const useRenderResources = (
             ratio: ratio,
             absorption: absorption,
             scattering: scattering,
+          },
+          bindGroupLayouts: {
+            uniform: uniformBindGroupLayout,
+            advection: advectionBindGroupLayout,
+            externalForces: externalForcesBindGroupLayout,
+            vorticityCalculation: vorticityCalculationBindGroupLayout,
+            vorticityConfinement: vorticityConfinementBindGroupLayout,
+            divergenceCalculation: divergenceCalculationBindGroupLayout,
+            pressureIteration: pressureIterationBindGroupLayout,
+            pressureGradientSubtraction: pressureGradientSubtractionBindGroupLayout,
+            reinitialization: reinitializationBindGroupLayout,
+            render: renderBindGroupLayout,
           },
         });
       } catch (e) {

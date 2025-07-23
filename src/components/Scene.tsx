@@ -71,18 +71,31 @@ const renderScene = (
     vorticityTextureB,
     divergenceTextureA,
     divergenceTextureB,
+    //Texture Views
+    densityTextureAView,
+    densityTextureBView,
+    velocityTextureAView,
+    velocityTextureBView,
+    temperatureTextureAView,
+    temperatureTextureBView,
+    pressureTextureAView,
+    pressureTextureBView,
+    vorticityTextureAView,
+    vorticityTextureBView,
+    divergenceTextureAView,
+    divergenceTextureBView,
     // Counts & Sizes
     slicesIndexCount,
     totalGridSize,
   } = renderResources;
 
   const simulationState: SimulationState = {
-    velocity: { current: velocityTextureA, next: velocityTextureB },
-    density: { current: densityTextureA, next: densityTextureB },
-    temperature: { current: temperatureTextureA, next: temperatureTextureB },
-    pressure: { current: pressureTextureA, next: pressureTextureB },
-    divergence: { current: divergenceTextureA, next: divergenceTextureB },
-    vorticity: { current: vorticityTextureA, next: vorticityTextureB },
+    velocity: { current: velocityTextureAView, next: velocityTextureBView },
+    density: { current: densityTextureAView, next: densityTextureBView },
+    temperature: { current: temperatureTextureAView, next: temperatureTextureBView },
+    pressure: { current: pressureTextureAView, next: pressureTextureBView },
+    divergence: { current: divergenceTextureAView, next: divergenceTextureBView },
+    vorticity: { current: vorticityTextureAView, next: vorticityTextureBView },
   };
 
   const workgroupSize: [number, number, number] = [4, 4, 4];

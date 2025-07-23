@@ -1,6 +1,6 @@
 export interface TexturePair {
-  current: GPUTexture;
-  next: GPUTexture;
+  current: GPUTextureView;
+  next: GPUTextureView;
 }
 
 export interface SimulationState {

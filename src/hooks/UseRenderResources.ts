@@ -48,6 +48,20 @@ export interface RenderPipelineResources {
   vorticityTextureB: GPUTexture;
   vorticityForceTextureA: GPUTexture;
   vorticityForceTextureB: GPUTexture;
+  densityTextureAView: GPUTextureView;
+  densityTextureBView: GPUTextureView;
+  velocityTextureAView: GPUTextureView;
+  velocityTextureBView: GPUTextureView;
+  temperatureTextureAView: GPUTextureView;
+  temperatureTextureBView: GPUTextureView;
+  pressureTextureAView: GPUTextureView;
+  pressureTextureBView: GPUTextureView;
+  divergenceTextureAView: GPUTextureView;
+  divergenceTextureBView: GPUTextureView;
+  vorticityTextureAView: GPUTextureView;
+  vorticityTextureBView: GPUTextureView;
+  vorticityForceTextureAView: GPUTextureView;
+  vorticityForceTextureBView: GPUTextureView;
   uniformsView: any;
   uniformConstants: {
     gridSize: [number, number, number];
@@ -413,6 +427,21 @@ export const useRenderResources = (
           [totalGridSize, totalGridSize, totalGridSize]
         );
 
+        const densityTextureAView = densityTextureA.createView();
+        const densityTextureBView = densityTextureB.createView();
+        const velocityTextureAView = velocityTextureA.createView();
+        const velocityTextureBView = velocityTextureB.createView();
+        const temperatureTextureAView = temperatureTextureA.createView();
+        const temperatureTextureBView = temperatureTextureB.createView();
+        const pressureTextureAView = pressureTextureA.createView();
+        const pressureTextureBView = pressureTextureB.createView();
+        const divergenceTextureAView = divergenceTextureA.createView();
+        const divergenceTextureBView = divergenceTextureB.createView();
+        const vorticityTextureAView = vorticityTextureA.createView();
+        const vorticityTextureBView = vorticityTextureB.createView();
+        const vorticityForceTextureAView = vorticityForceTextureA.createView();
+        const vorticityForceTextureBView = vorticityForceTextureB.createView();
+
         const uniformBindGroupLayout = layouts.createUniformBindGroupLayout(device);
         const renderBindGroupLayout = layouts.createRenderBindGroupLayout(device);
 
@@ -675,6 +704,20 @@ export const useRenderResources = (
           vorticityTextureB,
           vorticityForceTextureA,
           vorticityForceTextureB,
+          densityTextureAView,
+          densityTextureBView,
+          velocityTextureAView,
+          velocityTextureBView,
+          temperatureTextureAView,
+          temperatureTextureBView,
+          pressureTextureAView,
+          pressureTextureBView,
+          divergenceTextureAView,
+          divergenceTextureBView,
+          vorticityTextureAView,
+          vorticityTextureBView,
+          vorticityForceTextureAView,
+          vorticityForceTextureBView,
           uniformsView,
           uniformConstants: {
             gridSize: [internalGridSize, internalGridSize, internalGridSize],

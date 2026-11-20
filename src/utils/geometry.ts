@@ -1,32 +1,3 @@
-// helper so we can add four vertices (quad) + six indices at once.
-function addQuad(
-  vertexPositions: number[],
-  indicesList: number[],
-  p0: [number, number, number],
-  p1: [number, number, number],
-  p2: [number, number, number],
-  p3: [number, number, number]
-) {
-  // "startIndex" = how many vertices are in vertexPositions so far
-  const startIndex = vertexPositions.length / 3;
-
-  // push the 4 corner vertices of this quad
-  vertexPositions.push(...p0, ...p1, ...p2, ...p3);
-
-  // add two triangles (6 indices) in CCW order:
-  //   0--1
-  //   | /|
-  //   2--3
-  indicesList.push(
-    startIndex + 0,
-    startIndex + 2,
-    startIndex + 1,
-    startIndex + 2,
-    startIndex + 3,
-    startIndex + 1
-  );
-}
-
 export function generateBox() {
   const vertexPositions: number[] = [];
   const indicesList: number[] = [];
@@ -49,7 +20,6 @@ export function generateBox() {
   }
 
   // Define the 6 faces of the cube
-  // Each face is defined by 4 corner indices in counter-clockwise order when viewed from outside
   const faces = [
     [0, 1, 2, 3], // Back face   (z = -1)
     [4, 7, 6, 5], // Front face  (z = +1)
@@ -70,31 +40,7 @@ export function generateBox() {
     indicesList.push(v0, v2, v3);
   }
 
-  return { vertexPositions, indicesList };
-}
-
-export function generateWireframe() {
-  const vertexPositions: number[] = [];
-  const indicesList: number[] = [];
-
-  // 8 vertices of a cube
-  const vertices = [
-    [-1, -1, -1],
-    [1, -1, -1],
-    [1, 1, -1],
-    [-1, 1, -1], // back face
-    [-1, -1, 1],
-    [1, -1, 1],
-    [1, 1, 1],
-    [-1, 1, 1], // front face
-  ];
-
-  for (const vertex of vertices) {
-    vertexPositions.push(...vertex);
-  }
-
-  // 12 edges of the cube
-  const edges = [
+  const edgeIndices = [
     // Back face edges
     [0, 1],
     [1, 2],
@@ -110,11 +56,6 @@ export function generateWireframe() {
     [1, 5],
     [2, 6],
     [3, 7],
-  ];
-
-  for (const [start, end] of edges) {
-    indicesList.push(start, end);
-  }
-
-  return { vertexPositions, indicesList };
+  ].flat();
+  return { vertexPositions, indicesList, edgeIndices };
 }

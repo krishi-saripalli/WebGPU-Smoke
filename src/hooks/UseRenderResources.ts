@@ -1,763 +1,386 @@
 import { useEffect, useState } from 'react';
-import { WebGPUState } from './useWebGPU';
-import { Camera } from '@/modules/Camera';
-import { Vec3 } from 'gl-matrix';
-import { loadShader, loadShaderModules } from '@/utils/shader-loader';
-import { generateBox, generateWireframe } from '@/utils/geometry';
-import { initializeSimulationData } from '@/utils/initializion';
-import { makeStructuredView, makeShaderDataDefinitions } from 'webgpu-utils';
-import * as layouts from '@/utils/layouts';
-import { SHADER_PATHS, RENDER_ENTRY_POINTS, createComputePipeline } from '@/utils/shader-modules';
-
-export interface RenderPipelineResources {
-  slicesPipeline: GPURenderPipeline;
-  wireframePipeline: GPURenderPipeline;
-  externalForcesStepPipeline: GPUComputePipeline;
-  vorticityCalculationPipeline: GPUComputePipeline;
-  vorticityConfinementPipeline: GPUComputePipeline;
-  advectionPipeline: GPUComputePipeline;
-  divergenceCalculationPipeline: GPUComputePipeline;
-  pressureIterationPipeline: GPUComputePipeline;
-  pressureGradientSubtractionPipeline: GPUComputePipeline;
-  reinitializationPipeline: GPUComputePipeline;
-  slicesVertexBuffer: GPUBuffer;
-  slicesIndexBuffer: GPUBuffer;
-  wireframeVertexBuffer: GPUBuffer;
-  wireframeIndexBuffer: GPUBuffer;
-  uniformBuffer: GPUBuffer;
-  simulationParamsBuffer: GPUBuffer;
-  multisampleTexture: GPUTexture;
-  slicesIndexCount: number;
-  wireframeIndexCount: number;
-  camera: Camera;
-  gridSize: number;
-  totalGridSize: number;
-  halosSize: number;
-  sampler: GPUSampler;
-  densityTextureA: GPUTexture;
-  densityTextureB: GPUTexture;
-  velocityTextureA: GPUTexture;
-  velocityTextureB: GPUTexture;
-  temperatureTextureA: GPUTexture;
-  temperatureTextureB: GPUTexture;
-  pressureTextureA: GPUTexture;
-  pressureTextureB: GPUTexture;
-  divergenceTextureA: GPUTexture;
-  divergenceTextureB: GPUTexture;
-  vorticityTextureA: GPUTexture;
-  vorticityTextureB: GPUTexture;
-  vorticityForceTextureA: GPUTexture;
-  vorticityForceTextureB: GPUTexture;
-  densityTextureAView: GPUTextureView;
-  densityTextureBView: GPUTextureView;
-  velocityTextureAView: GPUTextureView;
-  velocityTextureBView: GPUTextureView;
-  temperatureTextureAView: GPUTextureView;
-  temperatureTextureBView: GPUTextureView;
-  pressureTextureAView: GPUTextureView;
-  pressureTextureBView: GPUTextureView;
-  divergenceTextureAView: GPUTextureView;
-  divergenceTextureBView: GPUTextureView;
-  vorticityTextureAView: GPUTextureView;
-  vorticityTextureBView: GPUTextureView;
-  vorticityForceTextureAView: GPUTextureView;
-  vorticityForceTextureBView: GPUTextureView;
-  uniformsView: any;
-  uniformConstants: {
-    gridSize: [number, number, number];
-    lightPosition: [number, number, number];
-    lightIntensity: [number, number, number];
-    ratio: [number, number, number];
-    absorption: number;
-    scattering: number;
-  };
-  bindGroupLayouts: {
-    uniform: GPUBindGroupLayout;
-    advection: GPUBindGroupLayout;
-    externalForces: GPUBindGroupLayout;
-    vorticityCalculation: GPUBindGroupLayout;
-    vorticityConfinement: GPUBindGroupLayout;
-    divergenceCalculation: GPUBindGroupLayout;
-    pressureIteration: GPUBindGroupLayout;
-    pressureGradientSubtraction: GPUBindGroupLayout;
-    reinitialization: GPUBindGroupLayout;
-    render: GPUBindGroupLayout;
-  };
-}
-
-const commonShaderCode = await loadShader(SHADER_PATHS.common);
-if (!commonShaderCode || commonShaderCode.trim().length === 0) {
-  throw new Error('Invalid common shader code: shader code is empty');
-}
-export const shaderDefs = makeShaderDataDefinitions(commonShaderCode);
-
-export const useRenderResources = (
-  webGPUState: WebGPUState | null,
-  shaderHeader: string,
-  min16float: string,
-  min16floatStorage: string
-) => {
-  const [resources, setResources] = useState<RenderPipelineResources | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    async function initResources() {
-      try {
-        if (!webGPUState) return;
-        const { device, canvasFormat } = webGPUState;
-
-        const shaderModules = await loadShaderModules(
-          device,
-          SHADER_PATHS,
-          shaderHeader,
-          min16floatStorage
-        );
-
-        const gridSize = 100;
-
-        const shaderDefs = makeShaderDataDefinitions(commonShaderCode);
-
-        const internalGridSize = gridSize;
-        const halosSize = 1;
-        const totalGridSize = internalGridSize + 2 * halosSize;
-
-        const uniformsView = makeStructuredView(shaderDefs.uniforms.uniforms);
-
-        const uniformBuffer = device.createBuffer({
-          size: uniformsView.arrayBuffer.byteLength,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-
-        const camera = new Camera({
-          position: new Vec3([-1.5, 0, 1.5]),
-          forward: new Vec3([1, 0, -1]),
-          up: new Vec3([0, 1, 0]),
-          heightAngle: Math.PI / 2,
-          near: 0.1,
-          far: 100,
-          aspect: 1,
-        });
-        const viewMatrix = camera.getViewMatrix() as Float32Array;
-        const projectionMatrix = camera.getProjectionMatrix() as Float32Array;
-        const cameraForward = camera.getForward() as Float32Array;
-        const cameraPos = camera.getPosition() as Float32Array;
-        const lightPosition: [number, number, number] = [-0.5, 0.8, 0.0];
-        const lightIntensity: [number, number, number] = [3 * 4.0, 3 * 3.5, 3 * 3.0];
-        const ratio: [number, number, number] = [1.0, 1.0, 1.0];
-        const absorption: number = 4.0;
-        const scattering: number = 5.0;
-
-        uniformsView.set({
-          viewMatrix: viewMatrix,
-          projectionMatrix: projectionMatrix,
-          gridSize: [internalGridSize, internalGridSize, internalGridSize],
-          cameraForward: cameraForward,
-          cameraPos: cameraPos,
-          lightPosition: lightPosition,
-          lightIntensity: lightIntensity,
-          ratio: ratio,
-          absorption: absorption,
-          scattering: scattering,
-        });
-
-        device.queue.writeBuffer(uniformBuffer, 0, uniformsView.arrayBuffer);
-
-        const simulationParamsView = makeStructuredView(shaderDefs.uniforms.params);
-
-        const simulationParamsBuffer = device.createBuffer({
-          size: simulationParamsView.arrayBuffer.byteLength,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-
-        simulationParamsView.set({
-          dt: 0.01,
-          dx: 1.0 / internalGridSize,
-          vorticityStrength: 8.0,
-          buoyancyAlpha: 19.8,
-          buoyancyBeta: 33.0,
-          ambientTemperature: 0.0,
-        });
-
-        device.queue.writeBuffer(simulationParamsBuffer, 0, simulationParamsView.arrayBuffer);
-
-        const velocityTextureA = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: 'rgba16float',
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const densityTextureA = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: min16floatStorage as GPUTextureFormat,
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST |
-            GPUTextureUsage.COPY_SRC,
-        });
-
-        const temperatureTextureA = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: min16floatStorage as GPUTextureFormat,
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const velocityTextureB = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: 'rgba16float',
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const densityTextureB = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: min16floatStorage as GPUTextureFormat,
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST |
-            GPUTextureUsage.COPY_SRC,
-        });
-
-        const temperatureTextureB = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: min16floatStorage as GPUTextureFormat,
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const pressureTextureA = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: min16floatStorage as GPUTextureFormat,
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const pressureTextureB = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: min16floatStorage as GPUTextureFormat,
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const divergenceTextureA = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: min16floatStorage as GPUTextureFormat,
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const divergenceTextureB = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: min16floatStorage as GPUTextureFormat,
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const vorticityTextureA = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: 'rgba16float',
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const vorticityTextureB = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: 'rgba16float',
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const vorticityForceTextureA = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: 'rgba16float',
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const vorticityForceTextureB = device.createTexture({
-          size: [totalGridSize, totalGridSize, totalGridSize],
-          dimension: '3d',
-          format: 'rgba16float',
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        });
-
-        const {
-          densityData: initDensityData,
-          temperatureData: initTemperatureData,
-          velocityData: initVelocityData,
-          pressureData: initPressureData,
-        } = initializeSimulationData(totalGridSize, halosSize, internalGridSize);
-
-        device.queue.writeTexture(
-          { texture: densityTextureA },
-          initDensityData,
-          { bytesPerRow: totalGridSize * 4, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-
-        //TODO: do these bytes (4 and 8 become 2 and 4) need to de dynamic based on the min16float type?
-        // or can I write in full precision from the javascript side and still re-interpret the values as f16 if enabled?
-        device.queue.writeTexture(
-          { texture: temperatureTextureA },
-          initTemperatureData,
-          { bytesPerRow: totalGridSize * 4, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-
-        device.queue.writeTexture(
-          { texture: velocityTextureA },
-          initVelocityData,
-          { bytesPerRow: totalGridSize * 8, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-
-        device.queue.writeTexture(
-          { texture: pressureTextureA },
-          initPressureData,
-          { bytesPerRow: totalGridSize * 4, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-
-        device.queue.writeTexture(
-          { texture: densityTextureB },
-          initDensityData,
-          { bytesPerRow: totalGridSize * 4, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-
-        device.queue.writeTexture(
-          { texture: temperatureTextureB },
-          initTemperatureData,
-          { bytesPerRow: totalGridSize * 4, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-
-        device.queue.writeTexture(
-          { texture: velocityTextureB },
-          initVelocityData,
-          { bytesPerRow: totalGridSize * 8, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-
-        device.queue.writeTexture(
-          { texture: pressureTextureB },
-          initPressureData,
-          { bytesPerRow: totalGridSize * 4, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-
-        const zeroDataRGBA16F = new Float32Array(totalGridSize * totalGridSize * totalGridSize * 4);
-        const zeroDataR32F = new Float32Array(totalGridSize * totalGridSize * totalGridSize);
-
-        device.queue.writeTexture(
-          { texture: divergenceTextureA },
-          zeroDataR32F,
-          { bytesPerRow: totalGridSize * 4, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-        device.queue.writeTexture(
-          { texture: divergenceTextureB },
-          zeroDataR32F,
-          { bytesPerRow: totalGridSize * 4, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-        device.queue.writeTexture(
-          { texture: vorticityTextureA },
-          zeroDataRGBA16F,
-          { bytesPerRow: totalGridSize * 8, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-        device.queue.writeTexture(
-          { texture: vorticityTextureB },
-          zeroDataRGBA16F,
-          { bytesPerRow: totalGridSize * 8, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-        device.queue.writeTexture(
-          { texture: vorticityForceTextureA },
-          zeroDataRGBA16F,
-          { bytesPerRow: totalGridSize * 8, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-        device.queue.writeTexture(
-          { texture: vorticityForceTextureB },
-          zeroDataRGBA16F,
-          { bytesPerRow: totalGridSize * 8, rowsPerImage: totalGridSize },
-          [totalGridSize, totalGridSize, totalGridSize]
-        );
-
-        const densityTextureAView = densityTextureA.createView();
-        const densityTextureBView = densityTextureB.createView();
-        const velocityTextureAView = velocityTextureA.createView();
-        const velocityTextureBView = velocityTextureB.createView();
-        const temperatureTextureAView = temperatureTextureA.createView();
-        const temperatureTextureBView = temperatureTextureB.createView();
-        const pressureTextureAView = pressureTextureA.createView();
-        const pressureTextureBView = pressureTextureB.createView();
-        const divergenceTextureAView = divergenceTextureA.createView();
-        const divergenceTextureBView = divergenceTextureB.createView();
-        const vorticityTextureAView = vorticityTextureA.createView();
-        const vorticityTextureBView = vorticityTextureB.createView();
-        const vorticityForceTextureAView = vorticityForceTextureA.createView();
-        const vorticityForceTextureBView = vorticityForceTextureB.createView();
-
-        const uniformBindGroupLayout = layouts.createUniformBindGroupLayout(device);
-        const renderBindGroupLayout = layouts.createRenderBindGroupLayout(device);
-
-        const advectionBindGroupLayout = layouts.createAdvectionBindGroupLayout(
-          device,
-          min16floatStorage
-        );
-        const externalForcesBindGroupLayout =
-          layouts.createExternalForcesStepBindGroupLayout(device);
-        const vorticityCalculationBindGroupLayout =
-          layouts.createVorticityCalculationBindGroupLayout(device);
-        const vorticityConfinementBindGroupLayout =
-          layouts.createVorticityConfinementBindGroupLayout(device);
-        const divergenceCalculationBindGroupLayout =
-          layouts.createDivergenceCalculationBindGroupLayout(device, min16floatStorage);
-        const pressureIterationBindGroupLayout = layouts.createPressureIterationBindGroupLayout(
-          device,
-          min16floatStorage
-        );
-        const pressureGradientSubtractionBindGroupLayout =
-          layouts.createPressureGradientSubtractionBindGroupLayout(device);
-        const reinitializationBindGroupLayout = layouts.createReinitializationBindGroupLayout(
-          device,
-          min16floatStorage
-        );
-
-        const sampler = device.createSampler({
-          addressModeU: 'clamp-to-edge',
-          addressModeV: 'clamp-to-edge',
-          addressModeW: 'clamp-to-edge',
-          magFilter: 'linear',
-          minFilter: 'linear',
-          mipmapFilter: 'nearest',
-        });
-
-        const { vertexPositions: slicesVertexPositions, indicesList: slicesIndicesList } =
-          generateBox();
-
-        const slicesVertices = new Float32Array(slicesVertexPositions);
-        const slicesIndices = new Uint32Array(slicesIndicesList);
-
-        const slicesVertexBuffer = device.createBuffer({
-          size: slicesVertices.byteLength,
-          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
-        device.queue.writeBuffer(slicesVertexBuffer, 0, slicesVertices);
-
-        const slicesIndexBuffer = device.createBuffer({
-          size: slicesIndices.byteLength,
-          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-        });
-        device.queue.writeBuffer(slicesIndexBuffer, 0, slicesIndices);
-
-        const { vertexPositions: wireframeVertexPositions, indicesList: wireframeIndicesList } =
-          generateWireframe();
-
-        const wireframeVertices = new Float32Array(wireframeVertexPositions);
-        const wireframeIndices = new Uint32Array(wireframeIndicesList);
-
-        const wireframeVertexBuffer = device.createBuffer({
-          size: wireframeVertices.byteLength,
-          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
-        device.queue.writeBuffer(wireframeVertexBuffer, 0, wireframeVertices);
-
-        const wireframeIndexBuffer = device.createBuffer({
-          size: wireframeIndices.byteLength,
-          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-        });
-        device.queue.writeBuffer(wireframeIndexBuffer, 0, wireframeIndices);
-        const baseRenderPipelineDescriptor: Omit<
-          GPURenderPipelineDescriptor,
-          'label' | 'fragment' | 'depthStencil'
-        > = {
-          layout: device.createPipelineLayout({
-            bindGroupLayouts: [uniformBindGroupLayout, renderBindGroupLayout],
-          }),
-          vertex: {
-            module: shaderModules[RENDER_ENTRY_POINTS.vertex.module],
-            entryPoint: RENDER_ENTRY_POINTS.vertex.entryPoint,
-            buffers: [
-              {
-                arrayStride: 12,
-                attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
-              },
-            ],
-          },
-          multisample: { count: 4 },
-          primitive: { topology: 'triangle-list', cullMode: 'none' },
-        };
-
-        const slicesPipeline = device.createRenderPipeline({
-          ...baseRenderPipelineDescriptor,
-          label: 'Slices Rendering',
-          fragment: {
-            module: shaderModules[RENDER_ENTRY_POINTS.fragmentSlices.module],
-            entryPoint: RENDER_ENTRY_POINTS.fragmentSlices.entryPoint,
-            targets: [
-              {
-                format: canvasFormat,
-                blend: {
-                  color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                },
-              },
-            ],
-          },
-        });
-
-        const wireframePipeline = device.createRenderPipeline({
-          ...baseRenderPipelineDescriptor,
-          label: 'Wireframe Rendering',
-          primitive: { topology: 'line-list' }, // This is the key change!
-          fragment: {
-            module: shaderModules[RENDER_ENTRY_POINTS.fragmentWireframe.module],
-            entryPoint: RENDER_ENTRY_POINTS.fragmentWireframe.entryPoint,
-            targets: [
-              {
-                format: canvasFormat,
-              },
-            ],
-          },
-        });
-
-        const externalForcesStepPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [uniformBindGroupLayout, externalForcesBindGroupLayout],
-        });
-        const externalForcesStepPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'externalForcesStep',
-          externalForcesStepPipelineLayout,
-          'External Forces Step'
-        );
-
-        const vorticityCalculationPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [uniformBindGroupLayout, vorticityCalculationBindGroupLayout],
-        });
-        const vorticityCalculationPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'vorticityCalculation',
-          vorticityCalculationPipelineLayout,
-          'Vorticity Calculation'
-        );
-
-        const vorticityConfinementPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [uniformBindGroupLayout, vorticityConfinementBindGroupLayout],
-        });
-        const vorticityConfinementPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'vorticityConfinement',
-          vorticityConfinementPipelineLayout,
-          'Vorticity Confinement'
-        );
-
-        const advectionPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [uniformBindGroupLayout, advectionBindGroupLayout],
-        });
-        const advectionPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'advection',
-          advectionPipelineLayout,
-          'Advection'
-        );
-
-        const divergenceCalculationPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [uniformBindGroupLayout, divergenceCalculationBindGroupLayout],
-        });
-        const divergenceCalculationPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'divergenceCalculation',
-          divergenceCalculationPipelineLayout,
-          'Divergence Calculation'
-        );
-
-        const pressureIterationPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [uniformBindGroupLayout, pressureIterationBindGroupLayout],
-        });
-        const pressureIterationPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'pressureIteration',
-          pressureIterationPipelineLayout,
-          'Pressure Iteration (Jacobi)'
-        );
-
-        const pressureGradientSubtractionPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [uniformBindGroupLayout, pressureGradientSubtractionBindGroupLayout],
-        });
-        const pressureGradientSubtractionPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'pressureGradientSubtraction',
-          pressureGradientSubtractionPipelineLayout,
-          'Pressure Gradient Subtraction'
-        );
-
-        const reinitializationPipelineLayout = device.createPipelineLayout({
-          bindGroupLayouts: [uniformBindGroupLayout, reinitializationBindGroupLayout],
-        });
-
-        const reinitializationPipeline = createComputePipeline(
-          device,
-          shaderModules,
-          'reinitialization',
-          reinitializationPipelineLayout,
-          'Reinitialization'
-        );
-
-        const multisampleTexture = device.createTexture({
-          format: canvasFormat,
-          usage: GPUTextureUsage.RENDER_ATTACHMENT,
-          size: [
-            webGPUState.context.getCurrentTexture().width,
-            webGPUState.context.getCurrentTexture().height,
-          ],
-          sampleCount: 4,
-        });
-
-        setResources({
-          slicesPipeline,
-          wireframePipeline,
-          externalForcesStepPipeline,
-          vorticityCalculationPipeline,
-          vorticityConfinementPipeline,
-          advectionPipeline,
-          divergenceCalculationPipeline,
-          pressureIterationPipeline,
-          pressureGradientSubtractionPipeline,
-          reinitializationPipeline,
-          slicesVertexBuffer,
-          slicesIndexBuffer,
-          uniformBuffer,
-          wireframeVertexBuffer,
-          wireframeIndexBuffer,
-          wireframeIndexCount: wireframeIndices.length,
-          simulationParamsBuffer,
-          multisampleTexture,
-          slicesIndexCount: slicesIndices.length,
-          camera,
-          gridSize: internalGridSize,
-          totalGridSize,
-          halosSize,
-          sampler,
-          densityTextureA,
-          densityTextureB,
-          velocityTextureA,
-          velocityTextureB,
-          temperatureTextureA,
-          temperatureTextureB,
-          pressureTextureA,
-          pressureTextureB,
-          divergenceTextureA,
-          divergenceTextureB,
-          vorticityTextureA,
-          vorticityTextureB,
-          vorticityForceTextureA,
-          vorticityForceTextureB,
-          densityTextureAView,
-          densityTextureBView,
-          velocityTextureAView,
-          velocityTextureBView,
-          temperatureTextureAView,
-          temperatureTextureBView,
-          pressureTextureAView,
-          pressureTextureBView,
-          divergenceTextureAView,
-          divergenceTextureBView,
-          vorticityTextureAView,
-          vorticityTextureBView,
-          vorticityForceTextureAView,
-          vorticityForceTextureBView,
-          uniformsView,
-          uniformConstants: {
-            gridSize: [internalGridSize, internalGridSize, internalGridSize],
-            lightPosition: lightPosition,
-            lightIntensity: lightIntensity,
-            ratio: ratio,
-            absorption: absorption,
-            scattering: scattering,
-          },
-          bindGroupLayouts: {
-            uniform: uniformBindGroupLayout,
-            advection: advectionBindGroupLayout,
-            externalForces: externalForcesBindGroupLayout,
-            vorticityCalculation: vorticityCalculationBindGroupLayout,
-            vorticityConfinement: vorticityConfinementBindGroupLayout,
-            divergenceCalculation: divergenceCalculationBindGroupLayout,
-            pressureIteration: pressureIterationBindGroupLayout,
-            pressureGradientSubtraction: pressureGradientSubtractionBindGroupLayout,
-            reinitialization: reinitializationBindGroupLayout,
-            render: renderBindGroupLayout,
-          },
-        });
-      } catch (e) {
-        const error = e instanceof Error ? e : new Error(String(e));
-        console.error('Failed to initialize render resources:', error);
-        setError(error);
-        setResources(null);
-      }
-    }
-
-    initResources().catch((error) => {
-      console.error('Unhandled error in initResources:', error);
-      setError(error instanceof Error ? error : new Error(String(error)));
-      setResources(null);
+import { Mat4 } from 'gl-matrix';
+import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
+import { generateBox } from '@/utils/geometry';
+import { loadShader, loadShaderModule } from '@/utils/shader-loader';
+import type { WebGPUState } from './useWebGPU';
+
+export const STEP_SECONDS = 1 / 60;
+type GridSize = [number, number, number];
+const GRID_SIZE: GridSize = [64, 160, 64];
+const COARSE_SIZE: GridSize = [GRID_SIZE[0] / 2, GRID_SIZE[1] / 2, GRID_SIZE[2] / 2];
+export type Stroke = { start: [number, number]; end: [number, number] };
+
+async function createSimulation(
+  { device, context, canvasFormat }: WebGPUState,
+  signal: AbortSignal
+) {
+  const common = await loadShader('common');
+  const names = [
+    'vorticity',
+    'vorticity_confinement',
+    'forces',
+    'advection',
+    'divergence',
+    'pressure',
+    'pressure_gradient',
+    'render',
+  ] as const;
+  const modules = Object.fromEntries(
+    await Promise.all(
+      names.map(async (name) => [name, await loadShaderModule(device, name, common)] as const)
+    )
+  ) as Record<(typeof names)[number], GPUShaderModule>;
+
+  function compute(name: (typeof names)[number], entryPoint = 'main') {
+    return device.createComputePipelineAsync({
+      label: name + '/' + entryPoint,
+      layout: 'auto',
+      compute: { module: modules[name], entryPoint },
     });
-  }, [webGPUState, min16float, min16floatStorage, shaderHeader]);
-
-  if (error) {
-    console.warn('Render resources initialization failed:', error);
   }
+  const vertex: GPUVertexState = {
+    module: modules.render,
+    entryPoint: 'vertexMain',
+    buffers: [
+      { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }] },
+    ],
+  };
+  const [
+    curl,
+    confinement,
+    forces,
+    advectVelocity,
+    divergence,
+    pressure,
+    restrict,
+    prolongate,
+    illuminate,
+    project,
+    advectSmoke,
+    render,
+    wireframe,
+  ] = await Promise.all([
+    compute('vorticity'),
+    compute('vorticity_confinement'),
+    compute('forces'),
+    compute('advection', 'advectVelocity'),
+    compute('divergence'),
+    compute('pressure'),
+    compute('pressure', 'restrictResidual'),
+    compute('pressure', 'prolongate'),
+    compute('render', 'illuminate'),
+    compute('pressure_gradient'),
+    compute('advection', 'advectSmoke'),
+    device.createRenderPipelineAsync({
+      label: 'Smoke volume',
+      layout: 'auto',
+      vertex,
+      primitive: { cullMode: 'back' },
+      fragment: {
+        module: modules.render,
+        entryPoint: 'fragmentVolume',
+        targets: [
+          {
+            format: canvasFormat,
+            blend: {
+              color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+              alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+            },
+          },
+        ],
+      },
+    }),
+    device.createRenderPipelineAsync({
+      label: 'Grid boundary',
+      layout: 'auto',
+      vertex,
+      primitive: { topology: 'line-list' },
+      fragment: {
+        module: modules.render,
+        entryPoint: 'fragmentWireframe',
+        targets: [{ format: canvasFormat }],
+      },
+    }),
+  ]);
+  signal.throwIfAborted();
+  const allocations: (GPUTexture | GPUBuffer)[] = [];
+  signal.addEventListener('abort', () => allocations.forEach((resource) => resource.destroy()), {
+    once: true,
+  });
+  function volume(label: string, format: GPUTextureFormat, grid = GRID_SIZE, halo = 1) {
+    const texture = device.createTexture({
+      label,
+      format,
+      dimension: '3d',
+      size: grid.map((n) => n + 2 * halo),
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+    });
+    allocations.push(texture);
+    return texture.createView();
+  }
+  function buffer(label: string, size: number, usage: GPUBufferUsageFlags) {
+    const result = device.createBuffer({ label, size, usage: usage | GPUBufferUsage.COPY_DST });
+    allocations.push(result);
+    return result;
+  }
+  const fields = {
+    velocity: [volume('Velocity A', 'rgba16float'), volume('Velocity B', 'rgba16float')],
+    smoke: [
+      volume('Density and temperature A', 'rgba16float'),
+      volume('Density and temperature B', 'rgba16float'),
+    ],
+    pressure: [volume('Pressure A', 'r32float'), volume('Pressure B', 'r32float')],
+    coarsePressure: [
+      volume('Coarse pressure A', 'r32float', COARSE_SIZE),
+      volume('Coarse pressure B', 'r32float', COARSE_SIZE),
+    ],
+    coarseRhs: volume('Coarse residual', 'r32float', COARSE_SIZE),
+    light: volume('Light transmittance', 'rgba8unorm', COARSE_SIZE, 0),
+    curl: volume('Curl and magnitude', 'rgba16float'),
+    force: volume('Cell-centered force', 'rgba16float'),
+    divergence: volume('Divergence', 'r32float'),
+  };
+  const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
+  const defs = makeShaderDataDefinitions(common);
+  const uniforms = makeStructuredView(defs.uniforms.uniforms);
+  const params = makeStructuredView(defs.uniforms.params);
+  const uniformBuffer = buffer(
+    'Scene uniforms',
+    uniforms.arrayBuffer.byteLength,
+    GPUBufferUsage.UNIFORM
+  );
+  const paramsBuffer = buffer(
+    'Simulation parameters',
+    params.arrayBuffer.byteLength,
+    GPUBufferUsage.UNIFORM
+  );
+  params.set({
+    dt: STEP_SECONDS,
+    dx: 1 / GRID_SIZE[1],
+    vorticityStrength: 8,
+    buoyancyAlpha: 0.02,
+    buoyancyBeta: 0.012,
+    ambientTemperature: 0,
+    dissipation: 0.12,
+  });
+  device.queue.writeBuffer(paramsBuffer, 0, params.arrayBuffer);
+  uniforms.set({
+    gridSize: GRID_SIZE,
+    absorption: 1.4,
+    scattering: 6,
+    lightPosition: [-0.2, 0.85, 0.16],
+    lightIntensity: [12, 12, 12],
+  });
+  const view = Mat4.create();
+  Mat4.lookAt(view, [0, 1.6, 5], [0, 0, 0], [0, 1, 0]);
+  const projection = Mat4.create();
+  const radius = Math.hypot(GRID_SIZE[0], GRID_SIZE[2]) / GRID_SIZE[1];
+  const halfHeight = Math.abs(view[5]) + radius * Math.abs(view[9]);
+  let viewHalfWidth = 0;
+  let viewHalfHeight = 0;
+  function resize(width: number, height: number) {
+    const aspect = width / height;
+    viewHalfHeight = 1.12 * Math.max(halfHeight, radius / aspect);
+    viewHalfWidth = viewHalfHeight * aspect;
+    Mat4.orthoZO(
+      projection,
+      -viewHalfWidth,
+      viewHalfWidth,
+      -viewHalfHeight,
+      viewHalfHeight,
+      0.1,
+      10
+    );
+    uniforms.set({ projectionMatrix: projection });
+    device.queue.writeBuffer(uniformBuffer, 0, uniforms.arrayBuffer);
+  }
+  resize(context.canvas.width, context.canvas.height);
+  function screenToView(x: number, y: number): [number, number] {
+    return [x * viewHalfWidth, y * viewHalfHeight];
+  }
+  const modelView = Mat4.create();
+  let yaw = -Math.PI / 6;
+  const coarseUniforms = makeStructuredView(defs.uniforms.uniforms);
+  coarseUniforms.set({ gridSize: COARSE_SIZE });
+  const coarseUniformBuffer = buffer(
+    'Coarse grid',
+    coarseUniforms.arrayBuffer.byteLength,
+    GPUBufferUsage.UNIFORM
+  );
+  device.queue.writeBuffer(coarseUniformBuffer, 0, coarseUniforms.arrayBuffer);
+  const coarseParams = makeStructuredView(defs.uniforms.params);
+  coarseParams.set({ dx: 1 / COARSE_SIZE[1] });
+  const coarseParamsBuffer = buffer(
+    'Coarse cell width',
+    coarseParams.arrayBuffer.byteLength,
+    GPUBufferUsage.UNIFORM
+  );
+  device.queue.writeBuffer(coarseParamsBuffer, 0, coarseParams.arrayBuffer);
+  const box = generateBox();
+  const vertices = new Float32Array(box.vertexPositions);
+  const indices = new Uint32Array(box.indicesList);
+  const vertexBuffer = buffer('Volume vertices', vertices.byteLength, GPUBufferUsage.VERTEX);
+  const indexBuffer = buffer('Volume indices', indices.byteLength, GPUBufferUsage.INDEX);
+  device.queue.writeBuffer(vertexBuffer, 0, vertices);
+  device.queue.writeBuffer(indexBuffer, 0, indices);
 
-  return resources;
-};
+  const edges = new Uint32Array(box.edgeIndices);
+  const edgeBuffer = buffer('Grid edges', edges.byteLength, GPUBufferUsage.INDEX);
+  device.queue.writeBuffer(edgeBuffer, 0, edges);
+
+  function group(
+    pipeline: GPUComputePipeline | GPURenderPipeline,
+    index: number,
+    resources: (GPUBindingResource | null)[]
+  ) {
+    return device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(index),
+      entries: resources.flatMap((resource, binding) => (resource ? [{ binding, resource }] : [])),
+    });
+  }
+  const fineGlobals = [{ buffer: uniformBuffer }, { buffer: paramsBuffer }];
+  const coarseGlobals = [{ buffer: coarseUniformBuffer }, { buffer: coarseParamsBuffer }];
+  const sceneGlobals = [{ buffer: uniformBuffer }];
+  function stage(
+    pipeline: GPUComputePipeline,
+    resources: (GPUBindingResource | null)[],
+    size = GRID_SIZE,
+    bindings = fineGlobals
+  ) {
+    const globals = group(pipeline, 0, bindings);
+    const [nx, ny, nz] = size.map((n) => Math.ceil(n / 4));
+    const inputs = group(pipeline, 1, resources);
+    return (pass: GPUComputePassEncoder) => {
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, globals);
+      pass.setBindGroup(1, inputs);
+      pass.dispatchWorkgroups(nx, ny, nz);
+    };
+  }
+  const jacobi = fields.pressure.map((p, i) =>
+    stage(pressure, [p, fields.divergence, fields.pressure[1 - i]])
+  );
+  const coarseJacobi = fields.coarsePressure.map((p, i) =>
+    stage(pressure, [p, fields.coarseRhs, fields.coarsePressure[1 - i]], COARSE_SIZE, coarseGlobals)
+  );
+  const restrictResidual = stage(
+    restrict,
+    [fields.pressure[0], fields.divergence, null, fields.coarseRhs, fields.coarsePressure[0]],
+    COARSE_SIZE
+  );
+  const addCorrection = stage(
+    prolongate,
+    [fields.pressure[0], null, fields.pressure[1], null, null, fields.coarsePressure[0]],
+    GRID_SIZE,
+    sceneGlobals
+  );
+
+  function solvePressure(pass: GPUComputePassEncoder) {
+    jacobi[0](pass);
+    jacobi[1](pass);
+    restrictResidual(pass);
+    for (let i = 0; i < 14; i++) coarseJacobi[i % 2](pass);
+    addCorrection(pass);
+    for (let i = 0; i < 5; i++) jacobi[(i + 1) % 2](pass);
+  }
+  const renderUniforms = group(render, 0, [{ buffer: uniformBuffer }]);
+  const wireUniforms = group(wireframe, 0, sceneGlobals);
+  const frames = fields.velocity.map((u, i) => {
+    const next = 1 - i;
+    const v = fields.velocity[next];
+    const smoke = fields.smoke[i];
+    const nextSmoke = fields.smoke[next];
+    const beforePressure = [
+      stage(curl, [u, fields.curl]),
+      stage(confinement, [fields.curl, fields.force]),
+      stage(forces, [u, fields.force, smoke, v]),
+      stage(advectVelocity, [v, sampler, u]),
+      stage(divergence, [u, fields.divergence]),
+    ];
+    return {
+      beforePressure,
+      projectVelocity: stage(project, [u, fields.pressure[0], v]),
+      advectSmoke: stage(advectSmoke, [v, sampler, null, smoke, nextSmoke]),
+      illuminate: stage(illuminate, [smoke, sampler, fields.light], COARSE_SIZE, sceneGlobals),
+      renderSmoke: group(render, 1, [smoke, sampler, null, fields.light]),
+    };
+  });
+
+  let parity = 0;
+  function step(steps: number, rotation: number, stroke: Stroke | null) {
+    yaw = (yaw + rotation) % (2 * Math.PI);
+    Mat4.rotateY(modelView, view, yaw);
+    const length = stroke
+      ? Math.hypot(stroke.end[0] - stroke.start[0], stroke.end[1] - stroke.start[1])
+      : 0;
+    uniforms.set({
+      modelViewMatrix: modelView,
+      cameraForward: [-modelView[2], -modelView[6], -modelView[10]],
+      brushStroke: stroke ? [...stroke.start, ...stroke.end] : [0, 0, 0, 0],
+      brushStrength: length && steps ? Math.min(2.5, 0.65 / length) / steps : 0,
+    });
+    device.queue.writeBuffer(uniformBuffer, 0, uniforms.arrayBuffer);
+    const encoder = device.createCommandEncoder({ label: 'Smoke frame' });
+    for (let n = 0; n < steps; n++) {
+      const frame = frames[parity];
+      const pass = encoder.beginComputePass();
+      for (const dispatch of frame.beforePressure) dispatch(pass);
+      solvePressure(pass);
+      frame.projectVelocity(pass);
+      frame.advectSmoke(pass);
+      parity = 1 - parity;
+      if (n === steps - 1) frames[parity].illuminate(pass);
+      pass.end();
+    }
+    const draw = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: context.getCurrentTexture().createView(),
+          loadOp: 'clear',
+          storeOp: 'store',
+          clearValue: { r: 15 / 255, g: 23 / 255, b: 42 / 255, a: 1 },
+        },
+      ],
+    });
+    draw.setPipeline(render);
+    draw.setBindGroup(0, renderUniforms);
+    draw.setBindGroup(1, frames[parity].renderSmoke);
+    draw.setVertexBuffer(0, vertexBuffer);
+    draw.setIndexBuffer(indexBuffer, 'uint32');
+    draw.drawIndexed(indices.length);
+    draw.setPipeline(wireframe);
+    draw.setBindGroup(0, wireUniforms);
+    draw.setIndexBuffer(edgeBuffer, 'uint32');
+    draw.drawIndexed(edges.length);
+    draw.end();
+    device.queue.submit([encoder.finish()]);
+  }
+  return { step, resize, screenToView };
+}
+
+type RenderPipelineResources = Awaited<ReturnType<typeof createSimulation>>;
+
+export function useRenderResources(state: WebGPUState | null) {
+  const [resources, setResources] = useState<RenderPipelineResources | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    setResources(null);
+    setError(null);
+    if (state) {
+      createSimulation(state, controller.signal)
+        .then((result) => {
+          if (!controller.signal.aborted) setResources(result);
+        })
+        .catch((e) => {
+          if (!controller.signal.aborted) {
+            setError(String(e));
+            controller.abort();
+          }
+        });
+    }
+    return () => controller.abort();
+  }, [state]);
+  return { resources, error };
+}

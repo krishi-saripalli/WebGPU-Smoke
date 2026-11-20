@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "smoke",
+  "main": "worker.js",
+  "account_id": "818e2ad21b87a548ca82164c80f6951c",
+  "compatibility_date": "2026-11-20",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "html_handling": "drop-trailing-slash",
+    "not_found_handling": "404-page",
+    "base_path": "/smoke",
+  },
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "www.krishisaripalli.com/smoke*", "zone_id": "a14889a22773174879ecce0347d58b87" },
+  ],
+}

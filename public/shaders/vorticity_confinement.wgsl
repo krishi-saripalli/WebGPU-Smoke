@@ -1,40 +1,44 @@
 @import "common.wgsl";
 
-@group(1) @binding(0) var vorticityIn: texture_3d<min16float>;
-@group(1) @binding(1) var velocityIn: texture_3d<min16float>;
-@group(1) @binding(2) var velocityOut: texture_storage_3d<rgba16float, write>;
+@group(1) @binding(0) var vorticityIn: texture_3d<f32>;
+@group(1) @binding(1) var forceOut: texture_storage_3d<rgba16float, write>;
 
-
-@compute @workgroup_size(4,4,4)
-fn main(@builtin(global_invocation_id) id : vec3<u32>) {
-  if (id.x < HALO_SIZE || id.x >= uniforms.gridSize.x + HALO_SIZE ||
-      id.y < HALO_SIZE || id.y >= uniforms.gridSize.y + HALO_SIZE ||
-      id.z < HALO_SIZE || id.z >= uniforms.gridSize.z + HALO_SIZE) {
-    return;
-  }
-
-  let pos = vec3<i32>(id);
+@compute @workgroup_size(4, 4, 4)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (any(id >= uniforms.gridSize)) { return; }
+  let pos = vec3i(id) + 1;
 
   // gradient of the *magnitude* of vorticity (Eq. 10)
-  let dvort_mag_dx = length(textureLoad(vorticityIn, pos + vec3<i32>(1,0,0), 0).xyz) - 
-                    length(textureLoad(vorticityIn, pos - vec3<i32>(1,0,0), 0).xyz);
-  let dvort_mag_dy = length(textureLoad(vorticityIn, pos + vec3<i32>(0,1,0), 0).xyz) - 
-                    length(textureLoad(vorticityIn, pos - vec3<i32>(0,1,0), 0).xyz);
-  let dvort_mag_dz = length(textureLoad(vorticityIn, pos + vec3<i32>(0,0,1), 0).xyz) - 
-                    length(textureLoad(vorticityIn, pos - vec3<i32>(0,0,1), 0).xyz);
-  var grad = vec3<min16float>(dvort_mag_dx, dvort_mag_dy, dvort_mag_dz) / (2.0 * params.dx);
+  let dvort_mag_dx = textureLoad(vorticityIn, cell(pos + X), 0).w -
+                    textureLoad(vorticityIn, cell(pos - X), 0).w;
+  let dvort_mag_dy = textureLoad(vorticityIn, cell(pos + Y), 0).w -
+                    textureLoad(vorticityIn, cell(pos - Y), 0).w;
+  let dvort_mag_dz = textureLoad(vorticityIn, cell(pos + Z), 0).w -
+                    textureLoad(vorticityIn, cell(pos - Z), 0).w;
+  var grad = vec3f(dvort_mag_dx, dvort_mag_dy, dvort_mag_dz) / (2.0 * params.dx);
 
   let gradLength = length(grad);
-  
+
   if (gradLength > 1e-6) {
     grad = grad / gradLength;
   } else {
-    grad = vec3<min16float>(0.0);
+    grad = vec3f(0.0);
   }
 
-  let vorticity = textureLoad(vorticityIn, id, 0).xyz;
-  let velocity = textureLoad(velocityIn, id, 0).xyz;
+  let vorticity = textureLoad(vorticityIn, pos, 0).xyz;
   let vorticity_conf = params.dx * params.vorticityStrength * cross(grad, vorticity);
 
-  textureStore(velocityOut, id, vec4f(velocity + vorticity_conf * params.dt, 0.0));
-} 
+  var force = vorticity_conf;
+  if (uniforms.brushStrength > 0.0) {
+    let center = (vec3f(id) + 0.5 - 0.5 * vec3f(uniforms.gridSize)) * (2.0 * params.dx);
+    let viewPosition = (uniforms.modelViewMatrix * vec4f(center, 1)).xy;
+    let start = uniforms.brushStroke.xy;
+    let delta = uniforms.brushStroke.zw - start;
+    let t = clamp(dot(viewPosition - start, delta) / max(dot(delta, delta), 1e-8), 0.0, 1.0);
+    let distance = length(viewPosition - (start + t * delta));
+    let weight = 1.0 - smoothstep(0.0, 0.22, distance);
+    let direction = (vec4f(delta, 0, 0) * uniforms.modelViewMatrix).xyz;
+    force += weight * uniforms.brushStrength * direction / params.dt;
+  }
+  textureStore(forceOut, pos, vec4f(force, 0));
+}

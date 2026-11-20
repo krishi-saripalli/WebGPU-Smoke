@@ -4,7 +4,7 @@
 
 A grid-based fluid solver mostly based on the paper [Visual Simulation of Smoke (Fedkiw et. al 2001)](https://web.stanford.edu/class/cs237d/smoke.pdf) and [Simulating Fluids, Fire, and Smoke in Real-Time (Chan 2023)](https://andrewkchan.dev/posts/fire.html)
 
-You can play around with it ![here](https://www.krishisaripalli.com/smoke)
+You can play around with it [here](https://www.krishisaripalli.com/smoke)
 
 ## Running
 
